@@ -1,0 +1,13 @@
+Flask==0.10.1
+Flask-Login==0.3.2
+Flask-Script==2.0.5
+Flask-SQLAlchemy==2.1
+Flask-Migrate==1.5.1
+rauth==0.7.2
+MySQL-python==1.2.5
+Jinja2==2.8
+pili==1.5.4
+
+# Flask-SocketIO==1.2
+# gevent==1.1b5
+# gevent-websocket==0.9.5
