@@ -7,6 +7,8 @@ rauth==0.7.2
 MySQL-python==1.2.5
 Jinja2==2.8
 pili==1.5.4
+requests>=2.1.0
+gunicorn==19.4.1
 
 # Flask-SocketIO==1.2
 # gevent==1.1b5
