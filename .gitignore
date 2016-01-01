@@ -3,4 +3,5 @@
 /config/development.py
 /config/production.py
 *.pyc
-logs
+/run
+/logs

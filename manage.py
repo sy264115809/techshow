@@ -1,5 +1,4 @@
 # coding=utf8
-from gunicorn_server import GunicornServer
 from app import create_app, db
 from config import load_config
 from flask_script import Manager
