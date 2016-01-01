@@ -33,7 +33,7 @@ def get_mobile_auth_code():
 
     user = User.query.filter_by(mobile = mobile).first()
     if user is None:
-        user = User(mobile)
+        user = User(mobile = mobile)
         user.get_auth_code_count = 0
 
     user.auth_code = _get_auth_code()
