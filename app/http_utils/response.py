@@ -1,7 +1,7 @@
-from flask import jsonify
+from flask import jsonify, request
 
 from app import login_manager
-from constants import *
+from app.http_utils.constants import *
 
 
 def success(data = None, code = API_OK, desc = None):
@@ -46,3 +46,12 @@ def channel_not_found():
 
 def max_number_of_channel():
     return fail(API_MAX_CHANNEL_TOUCHED)
+
+
+def send_message_too_frequently():
+    return fail(API_MESSAGE_TOO_FREQUENTLY)
+
+
+def rong_cloud_failed():
+    return fail(API_RONG_CLOUD_ERROR)
+

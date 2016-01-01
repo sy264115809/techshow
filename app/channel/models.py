@@ -26,10 +26,11 @@ class Channel(db.Model):
 
     created_at = db.Column(db.DateTime, default = datetime.now())
 
-    def __init__(self, title, owner):
+    def __init__(self, title, owner, **kwargs):
         self.title = title
         self.owner = owner
         self.stream_id = owner.stream_id
+        super(Channel, self).__init__(**kwargs)
 
     @property
     def is_published(self):

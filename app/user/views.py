@@ -8,10 +8,13 @@ from flask_login import login_required, current_user
 from rauth import OAuth2Service
 
 from app import db, login_manager
-from app.user.models import User
 from app.channel import constants as CHANNEL
 from app.channel.models import Channel
-from app.helper import success, bad_request, invalid_auth_code, user_not_found, oauth_fail
+from app.http_utils.response import success, bad_request, invalid_auth_code, user_not_found, oauth_fail, \
+    rong_cloud_failed
+from app.http_utils.request import paginate, query_params, rule
+from app.rong_cloud import ApiClient, ClientError
+from app.user.models import User
 
 users_endpoint = Blueprint('users', __name__, url_prefix = '/users')
 
@@ -33,7 +36,7 @@ def get_mobile_auth_code():
         user = User(mobile)
         user.get_auth_code_count = 0
 
-    user.auth_code = __get_auth_code()
+    user.auth_code = _get_auth_code()
     user.get_auth_code_count += 1
     user.last_get_auth_code_at = datetime.now()
     db.session.add(user)
@@ -66,12 +69,14 @@ def login_by_mobile():
 
         user.auth_code = ''
         user.get_auth_code_count = 0
+        user.rong_cloud_token = _get_rong_cloud_token(user)
         user.login()
 
         return success({
             'id': user.id,
             'mobile': user.mobile,
-            'api_key': user.api_key
+            'api_token': user.api_token,
+            'rong_cloud_token': user.rong_cloud_token
         })
     else:
         return invalid_auth_code()
@@ -86,7 +91,7 @@ def login_by_github():
     redirect_uri = url_for('users.login_by_github_callback',
                            next = request.args.get('next') or request.referrer or None,
                            _external = True)
-    return redirect(__github_oauth().get_authorize_url(redirect_uri = redirect_uri))
+    return redirect(_github_oauth().get_authorize_url(redirect_uri = redirect_uri))
 
 
 @users_endpoint.route('/login/github/callback', methods = ['GET'])
@@ -101,7 +106,7 @@ def login_by_github_callback():
 
     try:
         data = dict(code = code)
-        auth = __github_oauth().get_auth_session(data = data)
+        auth = _github_oauth().get_auth_session(data = data)
         info = auth.get('user').json()
     except Exception:
         return oauth_fail()
@@ -118,11 +123,13 @@ def login_by_github_callback():
                 avatar = info.get('avatar_url'),
                 bio = info.get('bio'),
         )
+    db.session.add(user)
 
-    user.login()
+    user.oauth_code = code
+    db.session.commit()
+
     return success({
-        'id': user.id,
-        'api_key': user.api_key
+        'auth_code': code
     })
 
 
@@ -134,7 +141,7 @@ def login_by_qiniu():
     """
     redirect_uri = url_for('users.login_by_qiniu_callback', next = request.args.get('next') or request.referrer or None,
                            _external = True)
-    return redirect(__qiniu_oauth().get_authorize_url(redirect_uri = redirect_uri, response_type = 'code'))
+    return redirect(_qiniu_oauth().get_authorize_url(redirect_uri = redirect_uri, response_type = 'code'))
 
 
 @users_endpoint.route('/login/qiniu/callback', methods = ['GET'])
@@ -149,7 +156,7 @@ def login_by_qiniu_callback():
 
     try:
         data = dict(code = code, grant_type = 'authorization_code')
-        auth = __qiniu_oauth().get_auth_session(data = data, decoder = lambda c: json.loads(c))
+        auth = _qiniu_oauth().get_auth_session(data = data, decoder = lambda c: json.loads(c))
         info = auth.get('info?access_token=' + auth.access_token).json().get('data')
     except Exception:
         return oauth_fail()
@@ -163,11 +170,33 @@ def login_by_qiniu_callback():
                 qiniu_email = info.get('email'),
                 gender = info.get('gender')
         )
+        db.session.add(user)
 
+    user.oauth_code = code
+    db.session.commit()
+
+    return success({
+        'auth_code': code
+    })
+
+
+@users_endpoint.route('/login', methods = ['POST'])
+def get_user_access_token():
+    code = request.form.get('auth_code')
+    if code is None:
+        return bad_request('missing argument "code"')
+
+    user = User.query.filter_by(oauth_code = code).first()
+    if user is None:
+        return invalid_auth_code()
+
+    user.auth_code = ''
+    user.rong_cloud_token = _get_rong_cloud_token(user)
     user.login()
     return success({
         'id': user.id,
-        'api_key': user.api_key
+        'api_token': user.api_token,
+        'rong_cloud_token': user.rong_cloud_token
     })
 
 
@@ -178,27 +207,70 @@ def logout():
     登出
     :return:
     """
-    current_user.api_key = ''
+    current_user.api_token = ''
     db.session.add(current_user)
     db.session.commit()
     return success()
 
 
-@users_endpoint.route('/<int:user_id>', methods = ['GET'])
+@users_endpoint.route('/token/rongcloud')
 @login_required
-def user_info(user_id):
-    """
-    指定用户的信息
-    :param user_id:要查询的user的id
-    :type user_id:int
-    :return:
-    """
-    user = User.query.get(user_id)
-    if user is None:
-        return user_not_found()
+def get_rong_cloud_token():
+    token = _get_rong_cloud_token()
+    if token is None:
+        return rong_cloud_failed()
+
+    current_user.rong_cloud_token = token
+    db.session.commit()
 
     return success({
-        'user': user.to_json()
+        'rong_cloud_token': token
+    })
+
+
+@users_endpoint.route('', methods = ['GET'])
+@login_required
+def get_users_info():
+    """
+    按条件查询用户. 支持的query params:
+    id - 用户id
+    nickname - 用户昵称
+
+    l - 返回条目数量限制, 默认10
+    p - 返回条目的起始页, 默认1
+    :return:
+    """
+    rules = [
+        rule('id', 'id'),
+        rule('nickname', 'nickname')
+    ]
+    q, bad = query_params(*rules)
+    if bad:
+        return bad_request(bad)
+
+    users = User.query.filter_by(**q).paginate(*paginate()).items
+    if len(users) == 0:
+        return user_not_found()
+
+    res = list()
+    for user in users:
+        res.append(user.to_json())
+
+    return success({
+        'count': len(res),
+        'users': res
+    })
+
+
+@users_endpoint.route('/my', methods = ['GET'])
+@login_required
+def get_my_info():
+    """
+    查询当前用户信息
+    :return:
+    """
+    return success({
+        'user': current_user.to_json()
     })
 
 
@@ -239,22 +311,22 @@ def get_user_publishing_channel(user_id):
 @login_manager.request_loader
 def load_user_from_request(request):
     # first, try to login using the api_key url arg
-    api_key = request.args.get('api_key')
-    if api_key:
-        user = User.query.filter_by(api_key = api_key).first()
+    api_token = request.args.get('api_token')
+    if api_token:
+        user = User.query.filter_by(api_token = api_token).first()
         if user:
             return user
 
     # next, try to login using Basic Auth
-    api_key = request.authorization
-    if api_key:
-        api_key = api_key.username
+    api_token = request.authorization
+    if api_token:
+        api_token = api_token.username
         try:
-            api_key = base64.b64decode(api_key)
+            api_token = base64.b64decode(api_token)
         except TypeError:
             pass
 
-        user = User.query.filter_by(api_key = api_key).first()
+        user = User.query.filter_by(api_token = api_token).first()
         if user:
             return user
 
@@ -262,18 +334,29 @@ def load_user_from_request(request):
     return None
 
 
-def __get_auth_code():
+def _get_auth_code():
     return random.randint(1000, 9999)
 
 
-def __github_oauth():
-    return __oauth('github')
+def _github_oauth():
+    return _oauth('github')
 
 
-def __qiniu_oauth():
-    return __oauth('qiniu')
+def _qiniu_oauth():
+    return _oauth('qiniu')
 
 
-def __oauth(which):
-    settings = current_app.config['OAUTH'][which]
+def _oauth(which):
+    settings = current_app.config['OAUTH'].get(which)
     return OAuth2Service(**settings) if settings else None
+
+
+def _get_rong_cloud_token(user):
+    try:
+        return ApiClient().user_get_token(
+                user_id = user.id,
+                name = user.nickname or user.name,
+                portrait_uri = user.avatar or 'https://avatars.githubusercontent.com/u/16420492'
+        ).get('token')
+    except ClientError:
+        return None

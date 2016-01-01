@@ -32,7 +32,9 @@ class User(db.Model, UserMixin):
     qiniu_name = db.Column(db.String(16))
     qiniu_email = db.Column(db.String(32))
 
-    api_key = db.Column(db.String(128))
+    oauth_code = db.Column(db.String(128))
+    api_token = db.Column(db.String(128))
+    rong_cloud_token = db.Column(db.String(128))
 
     stream_id = db.Column(db.String(64))
     stream_status = db.Column(db.Integer, default = USER.STREAM_UNBORN)
@@ -45,6 +47,8 @@ class User(db.Model, UserMixin):
     last_sign_in_at = db.Column(db.DateTime)
 
     is_banned = db.Column(db.Boolean, default = False)
+
+    last_send_message_at = db.Column(db.DateTime, default = datetime.now())
 
     created_at = db.Column(db.DateTime, default = datetime.now())
     updated_at = db.Column(db.DateTime, default = datetime.now(), onupdate = datetime.now())
@@ -69,9 +73,8 @@ class User(db.Model, UserMixin):
         self.sign_in_count += 1
 
         s = Serializer(current_app.config['SECRET_KEY'], salt = login_at.strftime('%Y-%m-%d %H:%M:%S'))
-        self.api_key = s.dumps({'id': self.id})
+        self.api_token = s.dumps({'id': self.id})
 
-        db.session.add(self)
         db.session.commit()
 
     def to_json(self):
