@@ -182,15 +182,15 @@ def login_by_qiniu_callback():
 
 @users_endpoint.route('/login', methods = ['POST'])
 def get_user_access_token():
-    code = request.form.get('auth_code')
+    code = request.json.get('auth_code')
     if code is None:
-        return bad_request('missing argument "code"')
+        return bad_request('missing argument "auth_code"')
 
     user = User.query.filter_by(oauth_code = code).first()
     if user is None:
         return invalid_auth_code()
 
-    user.auth_code = ''
+    user.oauth_code = ''
     user.rong_cloud_token = _get_rong_cloud_token(user)
     user.login()
     return success({
