@@ -18,6 +18,8 @@ def create_app(config):
     app.debug = app.config['DEBUG']
     app.secret_key = app.config['SECRET_KEY']
 
+    app.logger.info('Use config [%s]', config.__name__)
+
     db.init_app(app)
 
     login_manager.init_app(app)

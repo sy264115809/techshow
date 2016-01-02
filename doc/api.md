@@ -65,7 +65,7 @@
 |`API_OK`|2000|ok|成功|
 |`API_BAD_REQUEST`|4000|bad request|请求的参数缺失或格式不符|
 |`API_UNAUTHORIZED`|4010|unauthorized|未授权，一般是因为`api_token`不正确|
-|`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的手机验证码|
+|`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的登录验证码|
 |`API_OAUTH_FAIL`|4012|oauth fail|OAuth登录失败|
 |`API_MAX_CHANNEL_TOUCHED`|4031|touch maximum number of channels|达到最大频道数量|
 |`API_USER_NOT_FOUND`|4041|user not found|用户未找到|
@@ -91,7 +91,8 @@
 	- [类型声明: channel](#channel-definition)
 	- [类型声明: stream](#stream-definition)
 	- [创建频道](#create-channel)
-	- [获取频道信息](#get-channel-info)
+	- [获取直播频道信息](#get-live-channels)
+	- [获取回放频道信息](#get-playback-channels)
 	- [获取我的频道列表](#get-my-channels)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
@@ -197,11 +198,11 @@ GET /users/login/github
 {
   "code": 2000, 
   "desc": "ok", 
-  "oauth_code": <string oauth_code>
+  "auth_code": <string auth_code>
 }
 ```
 
-- `oauth_code`： `string`类型，凭此[登录](#login)
+- `auth_code`： `string`类型，凭此[登录](#login)
 
 **失败**
 
@@ -227,11 +228,11 @@ GET /users/login/qiniu
 {
   "code": 2000, 
   "desc": "ok", 
-  "oauth_code": <string oauth_code>
+  "auth_code": <string auth_code>
 }
 ```
 
-- `oauth_code`： `string`类型，凭此[登录](#login)
+- `auth_code`： `string`类型，凭此[登录](#login)
 
 **失败**
 
@@ -249,11 +250,11 @@ POST /users/login
 Content-Type: application/json
 
 {
-	"oauth_code": <string auth_code>
+	"auth_code": <string auth_code>
 }
 ```
 
-- `oauth_code`： `string`类型，OAuth成功后返回的`oauth_code`，一经登录即作废。
+- `auth_code`： `string`类型，OAuth成功后返回的`auth_code`，一经登录即作废。
 
 **成功**
 
@@ -561,12 +562,12 @@ API_MAX_CHANNEL_TOUCHED
 - `API_BAD_REQUEST`： 请检查`title`, `quality`, `orientation`是否在请求体中并格式正确。
 - `API_MAX_CHANNEL_TOUCHED`： 频道数达到管理员设置的最大频道数
 
-<a name="get-channel-info"></a>
-#### 获取频道信息
+<a name="get-live-channels"></a>
+#### 获取直播频道信息
 **请求**
 
 ```
-GET /channels
+GET /channels/live
 Authorization: Basic Auth
 ```
 
@@ -574,7 +575,57 @@ Authorization: Basic Auth
 
 - `id`： `int`类型，频道id。可选
 - `owner`： `int`类型，频道属主id。可选
-- `status`： `int`类型，[频道状态](#channel-status)。可选，且必须为`1`(推流中)或`2`(推流结束)
+- `p`： `int`类型，分页中的页数page，默认为`1`
+- `l`： `int`类型，分页中的限制limit，默认为`10`
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+	"channels":[
+		{
+	 		"channel": <channel>,
+			"stream": <stream>,
+			"playback": {
+				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
+			},
+			"playback": {
+				"flv": "http://xxxxx/hub/stream-id.flv",
+  				"hls": "http:/xxxxx/hub/stream-id.m3u8",
+			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
+			}
+		}
+	]
+}
+```
+
+- `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
+- `stream`： `stream`类型，本次创建的频道对应的流信息，定义见[这里](#stream-definition)
+- `playback`： 回放地址
+- `live`： 直播地址，推流结束时为`null`
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+```
+
+<a name="get-playback-channels"></a>
+#### 获取直播频道信息
+**请求**
+
+```
+GET /channels/playback
+Authorization: Basic Auth
+```
+
+**参数**
+
+- `id`： `int`类型，频道id。可选
+- `owner`： `int`类型，频道属主id。可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 

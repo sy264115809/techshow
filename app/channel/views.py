@@ -66,19 +66,13 @@ def create_channel():
     })
 
 
-@channels_endpoint.route('', methods = ['GET'])
+@channels_endpoint.route('/live', methods = ['GET'])
 @login_required
-def get_channels():
+def get_live_channels():
     """
-    按条件查询频道. 支持的query params:
+    按条件查询直播频道. 支持的query params:
     id - 频道id
     owner - 频道主人的id
-    status - 频道状态(只允许状态为1,2)
-        0 - init:       该channel刚刚建立,但未推送;
-        1 - publishing: 该channel处于直播状态;
-        2 - published:  该channel处于非直播状态;
-        3 - closed:     该channel已被用户关闭;
-        4 - banned:     该channel已被管理员禁止;
 
     p - 返回条目的起始页, 默认1
     l - 返回条目数量限制, 默认10
@@ -88,11 +82,37 @@ def get_channels():
     rules = [
         rule('id', 'id'),
         rule('owner_id', 'owner'),
-        rule('status', 'status', allow = [str(CHANNEL.PUBLISHING), str(CHANNEL.PUBLISHED)])
     ]
     q, bad = query_params(*rules)
     if bad:
         return bad_request(bad)
+    q['status'] = CHANNEL.PUBLISHING
+
+    channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
+    return _return_channels(channels)
+
+
+@channels_endpoint.route('/playback', methods = ['GET'])
+@login_required
+def get_playback_channels():
+    """
+    按条件查询已结束直播频道. 支持的query params:
+    id - 频道id
+    owner - 频道主人的id
+
+    p - 返回条目的起始页, 默认1
+    l - 返回条目数量限制, 默认10
+    :return:
+    """
+
+    rules = [
+        rule('id', 'id'),
+        rule('owner_id', 'owner'),
+    ]
+    q, bad = query_params(*rules)
+    if bad:
+        return bad_request(bad)
+    q['status'] = CHANNEL.PUBLISHED
 
     channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
     return _return_channels(channels)
