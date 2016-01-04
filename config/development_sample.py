@@ -7,7 +7,7 @@ import os
 class DevelopmentConfig(Config):
     DEBUG = True
 
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_HOUSEDB_URL') or 'mysql://username:password@server/db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_HOUSEDB_URL') or 'mysql://username:password@server/db?charset=utf8'
     SQLALCHEMY_TRACK_MODIFICATIONS = True
 
     PILI_ACCESS_KEY = ''
