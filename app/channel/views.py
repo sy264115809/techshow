@@ -33,7 +33,7 @@ def create_channel():
         rule('quality'),
         rule('orientation')
     ]
-    q, bad = query_params(*rules)
+    q, bad = must_json_params(*rules)
     if bad:
         return bad_request(bad)
 

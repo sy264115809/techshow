@@ -77,6 +77,6 @@ def _must_parse_params(rules, params):
             if r.allow and value not in r.allow:
                 return None, 'invalid argument "%s"' % r.param
             else:
-                q[r.colum] = value
+                q[r.param] = value
 
     return q, None
