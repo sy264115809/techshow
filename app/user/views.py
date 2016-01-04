@@ -115,16 +115,19 @@ def login_by_github_callback():
     if user is None:
         user = User(
                 github_id = info.get('id'),
-                github_login = info.get('login'),
                 nickname = info.get('login'),
-                github_name = info.get('name'),
                 name = info.get('name'),
-                github_email = info.get('email'),
                 avatar = info.get('avatar_url'),
                 bio = info.get('bio'),
         )
-    db.session.add(user)
+        db.session.add(user)
 
+    # update github info
+    user.github_login = info.get('login')
+    user.github_email = info.get('email')
+    user.github_name = info.get('name')
+
+    # update oauth code
     user.oauth_code = code
     db.session.commit()
 
@@ -165,13 +168,17 @@ def login_by_qiniu_callback():
     if user is None:
         user = User(
                 qiniu_id = info.get('uid'),
-                qiniu_name = info.get('full_name'),
                 name = info.get('full_name'),
-                qiniu_email = info.get('email'),
+                nickname = info.get('full_name'),
                 gender = info.get('gender')
         )
         db.session.add(user)
 
+    # update qiniu info
+    user.qiniu_name = info.get('full_name')
+    user.qiniu_email = info.get('email')
+
+    # update oauth_code
     user.oauth_code = code
     db.session.commit()
 
