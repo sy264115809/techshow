@@ -219,7 +219,46 @@ def finish():
     return success()
 
 
+@channels_endpoint.route('/like', methods = ['POST'])
+@login_required
+def like():
+    channel_id = request.json.get('id')
+    if channel_id is None:
+        return bad_request('missing argument "id"')
+
+    channel = Channel.query.get(channel_id)
+    if channel is None:
+        return channel_not_found()
+
+    ok = channel.like(current_user)
+    if ok:
+        db.session.commit()
+        return success()
+
+    return bad_request('user has already liked this channel.')
+
+
+@channels_endpoint.route('/dislike', methods = ['POST'])
+@login_required
+def dislike():
+    channel_id = request.json.get('id')
+    if channel_id is None:
+        return bad_request('missing argument "id"')
+
+    channel = Channel.query.get(channel_id)
+    if channel is None:
+        return channel_not_found()
+
+    ok = channel.dislike(current_user)
+    if ok:
+        db.session.commit()
+        return success()
+
+    return bad_request('user has already disliked this channel.')
+
+
 @channels_endpoint.route('/messages', methods = ['GET'])
+@login_required
 def get_channel_messages():
     """
     指定channel的消息列表,默认返回自起始时间算起10s内的消息列表
@@ -286,8 +325,11 @@ def _return_channels(channels):
                 'hls': stream.hls_playback_urls(start_second = start, end_second = end)['ORIGIN']
             }
 
+        ch = channel.to_json()
+        ch['is_liked'] = channel.is_like(current_user)
+
         c = {
-            'channel': channel.to_json(),
+            'channel': ch,
             'live': live,
             'playback': playback,
         }

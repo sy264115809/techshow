@@ -86,7 +86,8 @@
 - [用户相关](#api-user)
 	- [类型声明: user](#user-definition)
 	- [获取用户信息](#get-user-info)
-	- [获取我的用户信息](#get-my-info)
+	- [获取当前用户信息](#get-my-info)
+	- [更新当前用户信息](#update-my-info)
 - [频道相关](#api-channel)
 	- [类型声明: channel](#channel-definition)
 	- [类型声明: stream](#stream-definition)
@@ -96,6 +97,8 @@
 	- [获取我的频道列表](#get-my-channels)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
+	- [频道点赞](#channel-like)
+	- [频道取消点赞](#channel-dislike)
 
 ---
 
@@ -195,14 +198,8 @@ GET /users/login/github
 **成功**
 
 ```
-{
-  "code": 2000, 
-  "desc": "ok", 
-  "auth_code": <string auth_code>
-}
+返回html页面:"5秒后自动跳转"
 ```
-
-- `auth_code`： `string`类型，凭此[登录](#login)
 
 **失败**
 
@@ -225,14 +222,8 @@ GET /users/login/qiniu
 **成功**
 
 ```
-{
-  "code": 2000, 
-  "desc": "ok", 
-  "auth_code": <string auth_code>
-}
+返回html页面:"5秒后自动跳转"
 ```
-
-- `auth_code`： `string`类型，凭此[登录](#login)
 
 **失败**
 
@@ -263,13 +254,13 @@ Content-Type: application/json
   "code": 2000, 
   "desc": "ok", 
   "api_token": <string api_token>, 
-  "id": <int id>,
+  "user": <user user>,
   "rong_cloud_token": <string rong_cloud_token>
 }
 ```
 
 - `api_token`： `string`类型，用户本次[生命周期](#token-life-circle)中用于[鉴权](#authentication)的秘钥
-- `id`： `int`类型，用户的id
+- `user`： `user`类型（[定义](#user-definition)），当前用户
 - `rong_cloud_token`： `int`类型，融云的token
 
 **失败**
@@ -337,6 +328,7 @@ API_UNAUTHORIZED
 - `name`： `string`类型，用户名称
 - `nickname`： `string`类型，用户昵称
 - `bio`： `string`类型，用户个人签名
+<a name="user-definition-gender"></a>
 - `gender`： `int`类型，用户的性别
 	- `null`：unknown
 	- `0`：male
@@ -400,9 +392,12 @@ API_USER_NOT_FOUND
 #### 获取我的用户信息
 
 ```
-GET /users/my
+POST /users/my
 Authorization: Basic Auth
+Content-Type: application/json
 ```
+
+
 
 **成功**
 
@@ -414,12 +409,53 @@ Authorization: Basic Auth
 }
 ```
 
-- `user`：`user`类型（[定义](#user-definition)），我的用户信息
+- `user`：`user`类型（[定义](#user-definition)），当前用户信息
 
 **失败**
 
 ```
 API_UNAUTHORIZED
+```
+
+<a name="update-my-info"></a>
+#### 更新当前用户信息
+
+```
+GET /users
+Authorization: Basic Auth
+
+{
+    "avatar": <string avatar>,
+    "nickname": <string nickname>,
+    "gender": <int gender>,
+    "bio": <string bio>
+}
+```
+**参数**
+
+- `avatar`：`string`类型，用户头像
+- `nickname`： `string`类型，用户昵称
+- `gender`： `int`类型，用户性别（[定义](#user-definition-gender)）
+- `bio`： `string`类型，用户简介
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+	"user": <user>
+}
+```
+
+- `user`：`user`类型（[定义](#user-definition)），更新后的当前用户信息
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_BAD_REQUEST
+
 ```
 
 ----
@@ -591,7 +627,7 @@ Authorization: Basic Auth
 			"playback": {
 				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
 			},
-			"playback": {
+			"live": {
 				"flv": "http://xxxxx/hub/stream-id.flv",
   				"hls": "http:/xxxxx/hub/stream-id.m3u8",
 			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
@@ -614,7 +650,7 @@ API_CHANNEL_NOT_FOUND
 ```
 
 <a name="get-playback-channels"></a>
-#### 获取直播频道信息
+#### 获取回放频道信息
 **请求**
 
 ```
@@ -642,7 +678,7 @@ Authorization: Basic Auth
 			"playback": {
 				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
 			},
-			"playback": {
+			"live": {
 				"flv": "http://xxxxx/hub/stream-id.flv",
   				"hls": "http:/xxxxx/hub/stream-id.m3u8",
 			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
@@ -758,7 +794,7 @@ API_BAD_REQUEST
 **请求**
 
 ```
-POST /channels/<int channel_id>/finish
+POST /channels/finish
 Authorization: Basic Auth
 Content-Type: application/json
 
@@ -788,3 +824,75 @@ API_BAD_REQUEST
 
 - `API_UNAUTHORIZED`： 如果请求的用户和申请结束推流频道的所有者不是同一人，也会返回未授权。
 - `API_BAD_REQUEST`： 频道未处于`publishing`[状态](#channel-status)
+
+<a name="channel-like"></a>
+#### 频道点赞
+
+**请求**
+
+```
+POST /channels/like
+Authorization: Basic Auth
+Content-Type: application/json
+
+{
+	"id": <int id>
+}
+```
+
+- `id`： `int`类型，频道id。必须
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
+
+- `API_BAD_REQUEST`： 当前用户已经对该频道点赞
+
+<a name="channel-dislike"></a>
+#### 频道点赞
+
+**请求**
+
+```
+POST /channels/dislike
+Authorization: Basic Auth
+Content-Type: application/json
+
+{
+	"id": <int id>
+}
+```
+
+- `id`： `int`类型，频道id。必须
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
+
+- `API_BAD_REQUEST`： 当前用户并没有对该频道点赞

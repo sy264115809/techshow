@@ -5,6 +5,10 @@ from time import mktime
 from app import db
 from app.channel import constants as CHANNEL
 
+channel_user_like = db.Table('channel_user_like',
+                             db.Column('channel_id', db.Integer, db.ForeignKey('channel.id')),
+                             db.Column('user_id', db.Integer, db.ForeignKey('user.id')))
+
 
 class Channel(db.Model):
     id = db.Column(db.Integer, primary_key = True)
@@ -26,6 +30,11 @@ class Channel(db.Model):
 
     created_at = db.Column(db.DateTime, default = datetime.now())
 
+    liked_users = db.relationship('User',
+                                  secondary = channel_user_like,
+                                  backref = db.backref('like_channels', lazy = 'dynamic'),
+                                  lazy = 'dynamic')
+
     def __init__(self, title, owner, **kwargs):
         self.title = title
         self.owner = owner
@@ -39,6 +48,19 @@ class Channel(db.Model):
     @property
     def is_publishing(self):
         return self.status == CHANNEL.PUBLISHING
+
+    def like(self, user):
+        if not self.is_like(user):
+            self.liked_users.append(user)
+            return self
+
+    def dislike(self, user):
+        if self.is_like(user):
+            self.liked_users.remove(user)
+            return self
+
+    def is_like(self, user):
+        return self.liked_users.filter(channel_user_like.c.user_id == user.id).count() > 0
 
     def to_json(self):
         return {
