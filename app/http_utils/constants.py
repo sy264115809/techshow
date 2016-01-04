@@ -11,6 +11,7 @@ API_OAUTH_FAIL = 4012
 
 API_MAX_CHANNEL_TOUCHED = 4031
 API_MESSAGE_TOO_FREQUENTLY = 4032
+API_CHANNEL_ACCESS_DENIED = 4033
 
 API_USER_NOT_FOUND = 4041
 API_CHANNEL_NOT_FOUND = 4042
@@ -29,6 +30,7 @@ API_CODES = {
 
     API_MAX_CHANNEL_TOUCHED: 'touch maximum number of channels',
     API_MESSAGE_TOO_FREQUENTLY: 'send message too frequently',
+    API_CHANNEL_ACCESS_DENIED: 'channel in inaccessible status',
 
     API_USER_NOT_FOUND: 'user not found',
     API_CHANNEL_NOT_FOUND: 'channel not found',

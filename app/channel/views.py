@@ -11,7 +11,7 @@ from app import db
 from app.channel import constants as CHANNEL
 from app.channel.models import Channel, Complaint
 from app.http_utils.response import success, bad_request, unauthorized, max_number_of_channel, channel_not_found, \
-    rong_cloud_failed
+    rong_cloud_failed, channel_access_denied
 from app.http_utils.request import paginate, rule, query_params, json_params, must_json_params, must_query_params
 from app.message.models import Message
 from app.models.settings import Setting, SETTING_MAX_CHANNEL_NUMS
@@ -164,6 +164,9 @@ def get_channel_info():
     channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
+
+    if not channel.is_publishing and not channel.is_published:
+        return channel_access_denied()
 
     channel.visit_count += 1
     db.session.commit()

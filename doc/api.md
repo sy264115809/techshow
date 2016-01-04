@@ -68,6 +68,7 @@
 |`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的登录验证码|
 |`API_OAUTH_FAIL`|4012|oauth fail|OAuth登录失败|
 |`API_MAX_CHANNEL_TOUCHED`|4031|touch maximum number of channels|达到最大频道数量|
+|`API_CHANNEL_ACCESS_DENIED`|4033|channel in inaccessible status|频道不处于`推流中`或`结束推流`的[状态](#channel-status)|
 |`API_USER_NOT_FOUND`|4041|user not found|用户未找到|
 |`API_CHANNEL_NOT_FOUND`|4042|channel not found|频道未找到|
 
@@ -642,6 +643,7 @@ Authorization: Basic Auth
 ```
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
+API_CHANNEL_ACCESS_DENIED
 ```
 
 <a name="get-playback-channels"></a>

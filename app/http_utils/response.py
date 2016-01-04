@@ -52,6 +52,10 @@ def send_message_too_frequently():
     return fail(API_MESSAGE_TOO_FREQUENTLY)
 
 
+def channel_access_denied():
+    return fail(API_CHANNEL_ACCESS_DENIED)
+
+
 def rong_cloud_failed():
     return fail(API_RONG_CLOUD_ERROR)
 
