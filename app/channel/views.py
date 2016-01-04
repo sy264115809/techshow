@@ -28,17 +28,14 @@ def create_channel():
     创建一个新的频道
     :return:
     """
-    title = request.json.get('title')
-    if title is None:
-        return bad_request("missing argument 'title'")
-
-    quality = request.json.get('quality')
-    if quality is None:
-        return bad_request("missing argument 'quality'")
-
-    orientation = request.json.get('orientation')
-    if orientation is None:
-        return bad_request("missing arguments 'orientation'")
+    rules=[
+        rule('title'),
+        rule('quality'),
+        rule('orientation')
+    ]
+    q, bad = query_params(*rules)
+    if bad:
+        return bad_request(bad)
 
     max_nums = Setting.get_setting(SETTING_MAX_CHANNEL_NUMS, current_app.config.get(SETTING_MAX_CHANNEL_NUMS))
     if not Channel.query.filter_by(stopped_at = None).count() < max_nums:
@@ -56,7 +53,7 @@ def create_channel():
     Channel.query.filter_by(owner = user, status = CHANNEL.INITIATE).delete()
 
     # 新建频道
-    channel = Channel(title = title, owner = user, quality = quality, orientation = orientation)
+    channel = Channel(title = q['title'], owner = user, quality = q['quality'], orientation = q['orientation'])
     db.session.add(channel)
     db.session.commit()
 
@@ -71,17 +68,14 @@ def create_channel():
 def get_live_channels():
     """
     按条件查询直播频道. 支持的query params:
-    owner - 频道主人的id
+    owner_id - 频道主人的id
 
     p - 返回条目的起始页, 默认1
     l - 返回条目数量限制, 默认10
     :return:
     """
 
-    rules = [
-        rule('owner_id', 'owner'),
-    ]
-    q, bad = query_params(*rules)
+    q, bad = query_params(rule('owner_id'))
     if bad:
         return bad_request(bad)
 
@@ -96,17 +90,14 @@ def get_live_channels():
 def get_playback_channels():
     """
     按条件查询已结束直播频道. 支持的query params:
-    owner - 频道主人的id
+    owner_id - 频道主人的id
 
     p - 返回条目的起始页, 默认1
     l - 返回条目数量限制, 默认10
     :return:
     """
 
-    rules = [
-        rule('owner_id', 'owner'),
-    ]
-    q, bad = query_params(*rules)
+    q, bad = query_params(rule('owner_id'))
     if bad:
         return bad_request(bad)
 
@@ -133,10 +124,7 @@ def get_my_channels():
     :return:
     """
 
-    rules = [
-        rule('status')
-    ]
-    q, bad = query_params(*rules)
+    q, bad = query_params(rule('status'))
     if bad:
         return bad_request(bad)
 
@@ -154,10 +142,8 @@ def get_channel_info():
     id - 查询的频道id
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_query_params(*rules)
+
+    q, bad = must_query_params(rule('id'))
     if bad:
         return bad_request(bad)
 
@@ -184,10 +170,7 @@ def publish():
     id - 开始推流的频道id
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_json_params(*rules)
+    q, bad = must_json_params(rule('id'))
     if bad:
         return bad_request(bad)
 
@@ -231,10 +214,8 @@ def finish():
     id - 结束推流的频道id
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_json_params(*rules)
+
+    q, bad = must_json_params(rule('id'))
     if bad:
         return bad_request(bad)
 
@@ -263,10 +244,8 @@ def like():
     id - 点赞的频道id
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_json_params(*rules)
+
+    q, bad = must_json_params(rule('id'))
     if bad:
         return bad_request(bad)
 
@@ -292,10 +271,8 @@ def dislike():
     id - 取消点赞的频道id
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_json_params(*rules)
+
+    q, bad = must_json_params(rule('id'))
     if bad:
         return bad_request(bad)
 
@@ -350,10 +327,8 @@ def get_channel_messages():
     :type channel_id:int
     :return:
     """
-    rules = [
-        rule('id')
-    ]
-    q, bad = must_json_params(*rules)
+
+    q, bad = must_json_params(rule('id'))
     if bad:
         return bad_request(bad)
 

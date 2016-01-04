@@ -3,16 +3,14 @@ from flask import request
 
 
 class Rule(object):
-    def __init__(self, column, param, allow = None, must = True):
-        self.column = column
+    def __init__(self, param, allow = None, must = True):
         self.param = param
         self.allow = allow
         self.must = must
 
 
-def rule(column, param = None, allow = None, must = True):
-    param = column if param is None else param
-    return Rule(column, param, allow, must)
+def rule(param, allow = None, must = True):
+    return Rule(param, allow, must)
 
 
 def paginate():
@@ -44,14 +42,17 @@ def must_json_params(*rules):
 
 
 def _parse_params(rules, params):
+    white_list = ['p', 'l']
     allow_params = dict()
     allow_values = dict()
     for r in rules:
-        allow_params[r.param] = r.column
+        allow_params[r.param] = r.param
         allow_values[r.param] = r.allow
 
     q = dict()
     for k, v in params.items():
+        if k in white_list:
+            continue
         if k in allow_params:
             if allow_values[k] is not None and v not in allow_values[k]:
                 return None, 'invalid argument "%s"' % k
@@ -76,6 +77,6 @@ def _must_parse_params(rules, params):
             if r.allow and value not in r.allow:
                 return None, 'invalid argument "%s"' % r.param
             else:
-                q[r.param] = value
+                q[r.colum] = value
 
     return q, None

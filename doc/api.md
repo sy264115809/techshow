@@ -616,7 +616,7 @@ Authorization: Basic Auth
 
 **参数**
 
-- `owner`： `int`类型，频道属主id。可选
+- `owner_id`： `int`类型，频道属主id。可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 
@@ -657,7 +657,7 @@ Authorization: Basic Auth
 
 **参数**
 
-- `owner`： `int`类型，频道属主id。可选
+- `owner_id`： `int`类型，频道属主id。可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 
