@@ -3,7 +3,7 @@ import base64
 import random
 from datetime import datetime
 
-from flask import Blueprint, request, current_app, url_for, redirect, json
+from flask import Blueprint, request, current_app, url_for, redirect, json ,render_template
 from flask_login import login_required, current_user
 from rauth import OAuth2Service
 
@@ -131,9 +131,7 @@ def login_by_github_callback():
     user.oauth_code = code
     db.session.commit()
 
-    return success({
-        'auth_code': code
-    })
+    return render_template('login.html')
 
 
 @users_endpoint.route('/login/qiniu', methods = ['GET'])
@@ -182,9 +180,7 @@ def login_by_qiniu_callback():
     user.oauth_code = code
     db.session.commit()
 
-    return success({
-        'auth_code': code
-    })
+    return render_template('login.html')
 
 
 @users_endpoint.route('/login', methods = ['POST'])
@@ -201,7 +197,7 @@ def get_user_access_token():
     user.rong_cloud_token = _get_rong_cloud_token(user)
     user.login()
     return success({
-        'id': user.id,
+        'user': user.to_json(),
         'api_token': user.api_token,
         'rong_cloud_token': user.rong_cloud_token
     })
