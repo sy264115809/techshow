@@ -233,9 +233,12 @@ def finish():
     duration = 0
     start = mktime(channel.started_at.timetuple())
     end = mktime(stopped_at.timetuple())
-    segments = _get_stream(channel.stream_id).segments(start_second = start, end_second = end)
-    for segment in segments:
-        duration += segment['end'] - segment['start']
+    segments = _get_stream(channel.stream_id).segments(start_second = int(start), end_second = int(end))
+    if isinstance(segments, list):
+        for segment in segments:
+            duration += segment['duration']
+    else:
+        duration = segments['duration']
 
     channel.stopped_at = stopped_at
     channel.duration = duration
