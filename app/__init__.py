@@ -37,5 +37,7 @@ def create_app(config):
     app.register_blueprint(users_endpoint)
     from channel.views import channels_endpoint
     app.register_blueprint(channels_endpoint)
+    from message.views import messages_endpoint
+    app.register_blueprint(messages_endpoint)
 
     return app
