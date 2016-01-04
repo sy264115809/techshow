@@ -55,3 +55,6 @@ def send_message_too_frequently():
 def rong_cloud_failed():
     return fail(API_RONG_CLOUD_ERROR)
 
+
+def server_failed():
+    return fail(API_SERVER_FAILED)

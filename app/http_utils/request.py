@@ -9,7 +9,8 @@ class Rule(object):
         self.allow = allow
 
 
-def rule(column, param, allow = None):
+def rule(column, param = None, allow = None):
+    param = column if param is None else param
     return Rule(column, param, allow)
 
 
@@ -26,6 +27,17 @@ def paginate():
 
 
 def query_params(*rules):
+    return _parse_params(rules, request.args)
+
+
+def json_params(*rules):
+    return _parse_params(rules, request.json)
+
+
+def _parse_params(rules, params):
+    if params is None:
+        return None, 'no arguments received'
+
     allow_params = dict()
     allow_values = dict()
     for r in rules:
@@ -33,7 +45,7 @@ def query_params(*rules):
         allow_values[r.param] = r.allow
 
     q = dict()
-    for k, v in request.args.items():
+    for k, v in params.items():
         if k in allow_params:
             if allow_values[k] is not None and v not in allow_values[k]:
                 return None, 'invalid argument "%s"' % k

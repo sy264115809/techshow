@@ -3,17 +3,19 @@ import base64
 import random
 from datetime import datetime
 
-from flask import Blueprint, request, current_app, url_for, redirect, json ,render_template
+from flask import Blueprint, request, current_app, url_for, redirect, json, render_template
 from flask_login import login_required, current_user
+from sqlalchemy import exc
 from rauth import OAuth2Service
 
 from app import db, login_manager
 from app.channel import constants as CHANNEL
 from app.channel.models import Channel
 from app.http_utils.response import success, bad_request, invalid_auth_code, user_not_found, oauth_fail, \
-    rong_cloud_failed
-from app.http_utils.request import paginate, query_params, rule
+    rong_cloud_failed, server_failed
+from app.http_utils.request import paginate, rule, query_params, json_params
 from app.rong_cloud import ApiClient, ClientError
+from app.user import constants as USER
 from app.user.models import User
 
 users_endpoint = Blueprint('users', __name__, url_prefix = '/users')
@@ -244,8 +246,8 @@ def get_users_info():
     :return:
     """
     rules = [
-        rule('id', 'id'),
-        rule('nickname', 'nickname')
+        rule('id'),
+        rule('nickname')
     ]
     q, bad = query_params(*rules)
     if bad:
@@ -272,6 +274,35 @@ def get_my_info():
     查询当前用户信息
     :return:
     """
+    return success({
+        'user': current_user.to_json()
+    })
+
+
+@users_endpoint.route('', methods = ['POST'])
+@login_required
+def update_user_info():
+    """
+    更新当前用户信息
+    :return:
+    """
+    rules = [
+        rule('avatar'),
+        rule('nickname'),
+        rule('gender', allow = [USER.GENDER_MALE, USER.GENDER_FEMALE]),
+        rule('bio')
+    ]
+    q, bad = json_params(*rules)
+    if bad:
+        return bad_request(bad)
+
+    try:
+        User.query.filter_by(id = current_user.id).update(q)
+        db.session.commit()
+    except exc.SQLAlchemyError, e:
+        current_app.logger.error('update user info with error: ', e.message)
+        return server_failed()
+
     return success({
         'user': current_user.to_json()
     })
