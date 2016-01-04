@@ -1,5 +1,6 @@
 # coding=utf8
 import os
+import logging
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -18,7 +19,12 @@ def create_app(config):
     app.debug = app.config['DEBUG']
     app.secret_key = app.config['SECRET_KEY']
 
-    app.logger.info('Use config [%s]', config.__name__)
+    # add handler to redirect to gunicorn error
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    app.logger.addHandler(handler)
+    app.logger.handlers.extend(logging.getLogger("gunicorn.error").handlers)
+    app.logger.info('Config Usage : [%s]', config.__name__)
 
     db.init_app(app)
 
