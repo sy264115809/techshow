@@ -3,15 +3,16 @@ from flask import request
 
 
 class Rule(object):
-    def __init__(self, column, param, allow = None):
+    def __init__(self, column, param, allow = None, must = True):
         self.column = column
         self.param = param
         self.allow = allow
+        self.must = must
 
 
-def rule(column, param = None, allow = None):
+def rule(column, param = None, allow = None, must = True):
     param = column if param is None else param
-    return Rule(column, param, allow)
+    return Rule(column, param, allow, must)
 
 
 def paginate():
@@ -34,10 +35,15 @@ def json_params(*rules):
     return _parse_params(rules, request.json)
 
 
-def _parse_params(rules, params):
-    if params is None:
-        return None, 'no arguments received'
+def must_query_params(*rules):
+    return _must_parse_params(rules, request.args)
 
+
+def must_json_params(*rules):
+    return _must_parse_params(rules, request.json)
+
+
+def _parse_params(rules, params):
     allow_params = dict()
     allow_values = dict()
     for r in rules:
@@ -53,5 +59,23 @@ def _parse_params(rules, params):
                 q[allow_params[k]] = v
         else:
             return None, 'invalid argument "%s"' % k
+
+    return q, None
+
+
+def _must_parse_params(rules, params):
+    if params is None:
+        return None, 'no arguments received'
+
+    q = dict()
+    for r in rules:
+        value = params.get(r.param)
+        if r.must and value is None:
+            return None, 'missing argument "%s"' % r.param
+        else:
+            if r.allow and value not in r.allow:
+                return None, 'invalid argument "%s"' % r.param
+            else:
+                q[r.param] = value
 
     return q, None

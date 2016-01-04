@@ -9,10 +9,10 @@ from pili import *
 
 from app import db
 from app.channel import constants as CHANNEL
-from app.channel.models import Channel
+from app.channel.models import Channel, Complaint
 from app.http_utils.response import success, bad_request, unauthorized, max_number_of_channel, channel_not_found, \
     rong_cloud_failed
-from app.http_utils.request import paginate, query_params, rule
+from app.http_utils.request import paginate, rule, query_params, json_params, must_json_params, must_query_params
 from app.message.models import Message
 from app.models.settings import Setting, SETTING_MAX_CHANNEL_NUMS
 from app.rong_cloud import ApiClient, ClientError
@@ -84,6 +84,7 @@ def get_live_channels():
     q, bad = query_params(*rules)
     if bad:
         return bad_request(bad)
+
     q['status'] = CHANNEL.PUBLISHING
 
     channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
@@ -108,6 +109,7 @@ def get_playback_channels():
     q, bad = query_params(*rules)
     if bad:
         return bad_request(bad)
+
     q['status'] = CHANNEL.PUBLISHED
 
     channels = Channel.query.filter_by(**q).order_by(Channel.stopped_at.desc()).paginate(*paginate()).items
@@ -132,7 +134,7 @@ def get_my_channels():
     """
 
     rules = [
-        rule('status', 'status')
+        rule('status')
     ]
     q, bad = query_params(*rules)
     if bad:
@@ -148,14 +150,18 @@ def get_my_channels():
 @login_required
 def get_channel_info():
     """
-    查询频道的流信息
+    查询频道的流信息. 必须的query params:
+    id - 查询的频道id
     :return:
     """
-    channel_id = request.args.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_query_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 
@@ -171,14 +177,18 @@ def get_channel_info():
 @login_required
 def publish():
     """
-    开始推流
+    开始推流. 必须的query params:
+    id - 开始推流的频道id
     :return:
     """
-    channel_id = request.json.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 
@@ -214,14 +224,18 @@ def publish():
 @login_required
 def finish():
     """
-    结束推流
+    结束推流. 必须的query params:
+    id - 结束推流的频道id
     :return:
     """
-    channel_id = request.json.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 
@@ -241,11 +255,19 @@ def finish():
 @channels_endpoint.route('/like', methods = ['POST'])
 @login_required
 def like():
-    channel_id = request.json.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    """
+    频道点赞. 必须的query params:
+    id - 点赞的频道id
+    :return:
+    """
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 
@@ -262,11 +284,19 @@ def like():
 @channels_endpoint.route('/dislike', methods = ['POST'])
 @login_required
 def dislike():
-    channel_id = request.json.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    """
+    取消频道点赞. 必须的query params:
+    id - 取消点赞的频道id
+    :return:
+    """
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 
@@ -280,6 +310,34 @@ def dislike():
     return bad_request('user has already disliked this channel.')
 
 
+@channels_endpoint.route('/complain', methods = ['POST'])
+@login_required
+def send_complain():
+    """
+    举报频道. 必须的query params:
+    id - 被举报的频道id
+    reason - 举报原因
+    :return:
+    """
+    rules = [
+        rule('id'),
+        rule('reason')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
+
+    channel = Channel.query.get(q['id'])
+    if channel is None:
+        return channel_not_found()
+
+    complain = Complaint(reporter = current_user, channel = channel, reason = q['reason'])
+    db.session.add(complain)
+    db.session.commit()
+    # TODO:通知管理员
+    return success()
+
+
 @channels_endpoint.route('/messages', methods = ['GET'])
 @login_required
 def get_channel_messages():
@@ -289,11 +347,14 @@ def get_channel_messages():
     :type channel_id:int
     :return:
     """
-    channel_id = request.json.get('id')
-    if channel_id is None:
-        return bad_request('missing argument "id"')
+    rules = [
+        rule('id')
+    ]
+    q, bad = must_json_params(*rules)
+    if bad:
+        return bad_request(bad)
 
-    channel = Channel.query.get(channel_id)
+    channel = Channel.query.get(q['id'])
     if channel is None:
         return channel_not_found()
 

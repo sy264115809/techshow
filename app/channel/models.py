@@ -82,3 +82,16 @@ class Channel(db.Model):
             'stopped_at': mktime(self.stopped_at.timetuple()) if self.stopped_at else None,
             'created_at': mktime(self.created_at.timetuple())
         }
+
+
+class Complaint(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    reporter = db.relationship('User', backref = db.backref('complaints', lazy = 'dynamic'))
+    channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'))
+    channel = db.relationship('Channel', backref = db.backref('complaints', lazy = 'dynamic'))
+    reason_type = db.Column(db.Integer)
+    reason = db.Column(db.Text)
+
+    def __init__(self, **kwargs):
+        super(Complaint, self).__init__(**kwargs)

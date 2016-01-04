@@ -100,6 +100,7 @@
 	- [结束推流](#channel-finish)
 	- [频道点赞](#channel-like)
 	- [频道取消点赞](#channel-dislike)
+	- [投诉频道](#send-channel-complain)
 
 ---
 
@@ -905,3 +906,39 @@ API_BAD_REQUEST
 ```
 
 - `API_BAD_REQUEST`： 当前用户并没有对该频道点赞
+
+<a name="send-channel-complain"></a>
+#### 举报频道
+
+**请求**
+
+```
+POST /channels/complain
+Authorization: Basic Auth
+Content-Type: application/json
+
+{
+	"id": <int id>,
+	"reason": <string reason>
+}
+```
+
+- `id`： `int`类型，频道id。必须
+- `reason`： `string`类型，投诉理由。必须
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
