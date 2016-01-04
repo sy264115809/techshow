@@ -71,7 +71,6 @@ def create_channel():
 def get_live_channels():
     """
     按条件查询直播频道. 支持的query params:
-    id - 频道id
     owner - 频道主人的id
 
     p - 返回条目的起始页, 默认1
@@ -80,7 +79,6 @@ def get_live_channels():
     """
 
     rules = [
-        rule('id', 'id'),
         rule('owner_id', 'owner'),
     ]
     q, bad = query_params(*rules)
@@ -97,7 +95,6 @@ def get_live_channels():
 def get_playback_channels():
     """
     按条件查询已结束直播频道. 支持的query params:
-    id - 频道id
     owner - 频道主人的id
 
     p - 返回条目的起始页, 默认1
@@ -106,7 +103,6 @@ def get_playback_channels():
     """
 
     rules = [
-        rule('id', 'id'),
         rule('owner_id', 'owner'),
     ]
     q, bad = query_params(*rules)
@@ -114,7 +110,7 @@ def get_playback_channels():
         return bad_request(bad)
     q['status'] = CHANNEL.PUBLISHED
 
-    channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
+    channels = Channel.query.filter_by(**q).order_by(Channel.stopped_at.desc()).paginate(*paginate()).items
     return _return_channels(channels)
 
 
@@ -146,6 +142,29 @@ def get_my_channels():
 
     channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
     return _return_channels(channels)
+
+
+@channels_endpoint.route('/info', methods = ['GET'])
+@login_required
+def get_channel_info():
+    """
+    查询频道的流信息
+    :return:
+    """
+    channel_id = request.args.get('id')
+    if channel_id is None:
+        return bad_request('missing argument "id"')
+
+    channel = Channel.query.get(channel_id)
+    if channel is None:
+        return channel_not_found()
+
+    channel.visit_count += 1
+    db.session.commit()
+
+    return success({
+        'channel': _assemble_channel(channel)
+    })
 
 
 @channels_endpoint.route('/publish', methods = ['POST'])
@@ -230,8 +249,10 @@ def like():
     if channel is None:
         return channel_not_found()
 
+    # TODO:redis缓存
     ok = channel.like(current_user)
     if ok:
+        channel.like_count += 1
         db.session.commit()
         return success()
 
@@ -249,8 +270,10 @@ def dislike():
     if channel is None:
         return channel_not_found()
 
+    # TODO:redis缓存
     ok = channel.dislike(current_user)
     if ok:
+        channel.like_count -= 1
         db.session.commit()
         return success()
 
@@ -304,43 +327,41 @@ def _return_channels(channels):
     if not len(channels):
         return channel_not_found()
 
-    res = list()
+    ret = list()
     for channel in channels:
-        stream = _get_stream(channel.stream_id)
+        ret.append(_assemble_channel(channel, need_url = False))
+
+    return success({
+        'count': len(ret),
+        'channels': ret
+    })
+
+
+def _assemble_channel(channel, need_url = True):
+    stream = _get_stream(channel.stream_id)
+
+    ret = {
+        'channel': channel.to_json(),
+        'is_liked': channel.is_like(current_user),
+    }
+
+    if need_url:
         # 直播地址
-        live = None
         if channel.is_publishing:
             live = {
                 'rtmp': stream.rtmp_live_urls()['ORIGIN'],
                 'hls': stream.hls_live_urls()['ORIGIN'],
                 'flv': stream.http_flv_live_urls()['ORIGIN']
             }
+            ret['live'] = live
 
         # 回放地址
-        playback = None
-        if channel.is_publishing or channel.is_published:
+        if channel.is_published:
             start = mktime(channel.started_at.timetuple())
-            end = mktime(channel.stopped_at.timetuple()) if channel.is_published else mktime(datetime.now().timetuple())
+            end = mktime(channel.stopped_at.timetuple())
             playback = {
                 'hls': stream.hls_playback_urls(start_second = start, end_second = end)['ORIGIN']
             }
+            ret['playback'] = playback
 
-        ch = channel.to_json()
-        ch['is_liked'] = channel.is_like(current_user)
-
-        c = {
-            'channel': ch,
-            'live': live,
-            'playback': playback,
-        }
-
-        # 如果当前用户就是频道属主, 添加stream信息
-        if channel.owner == current_user:
-            c['stream'] = json.loads(stream.to_json())
-
-        res.append(c)
-
-    return success({
-        'count': len(res),
-        'channels': res
-    })
+    return ret

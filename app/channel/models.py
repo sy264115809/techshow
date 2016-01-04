@@ -25,6 +25,9 @@ class Channel(db.Model):
     orientation = db.Column(db.Integer)
     duration = db.Column(db.String(16))
 
+    visit_count = db.Column(db.Integer, default = 0)
+    like_count = db.Column(db.Integer, default = 0)
+
     started_at = db.Column(db.DateTime)
     stopped_at = db.Column(db.DateTime)
 
@@ -73,6 +76,8 @@ class Channel(db.Model):
             'duration': self.duration,
             'status': self.status,
             'owner': self.owner.to_json(),
+            'visit_count': self.visit_count,
+            'like_count': self.like_count,
             'started_at': mktime(self.started_at.timetuple()) if self.started_at else None,
             'stopped_at': mktime(self.stopped_at.timetuple()) if self.stopped_at else None,
             'created_at': mktime(self.created_at.timetuple())

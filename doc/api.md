@@ -95,6 +95,7 @@
 	- [获取直播频道信息](#get-live-channels)
 	- [获取回放频道信息](#get-playback-channels)
 	- [获取我的频道列表](#get-my-channels)
+	- [获取指定频道信息](#get-channel-info)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
 	- [频道点赞](#channel-like)
@@ -477,7 +478,9 @@ API_BAD_REQUEST
   	"orientation": <int orientation>,
   	"quality": <int quality>,
   	"status": <int status>,
-  	"owner": <user>,  
+  	"owner": <user>,
+  	"visit_count": <int visit_count>,
+  	"like_count": <int like_count>,
 	"started_at": <timestamp statred_at>,
   	"stopped_at": <timestamp stopped_at>,
   	"created_at": <timestamp created_at>
@@ -498,6 +501,8 @@ API_BAD_REQUEST
 	- `3`：关闭（由频道拥有者操作）
 	- `4`：禁止（由管理员操作）
 - `owner`：`user`类型（[定义](#user-definition)），频道的拥有者
+- `visit_count`： `int`类型，当前频道被点击的数目
+- `like_count`： `int`类型，当前频道被点赞的数目
 - `started_at`： `timestamp`类型，开始推流的时间
 - `stopped_at`： `timestamp`类型，结束推流的时间
 - `created_at`： `timestamp`类型，频道创建的时间
@@ -609,7 +614,6 @@ Authorization: Basic Auth
 
 **参数**
 
-- `id`： `int`类型，频道id。可选
 - `owner`： `int`类型，频道属主id。可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
@@ -623,24 +627,14 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"stream": <stream>,
-			"playback": {
-				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
-			},
-			"live": {
-				"flv": "http://xxxxx/hub/stream-id.flv",
-  				"hls": "http:/xxxxx/hub/stream-id.m3u8",
-			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
-			}
+			"is_liked": <bool is_liked>
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `stream`： `stream`类型，本次创建的频道对应的流信息，定义见[这里](#stream-definition)
-- `playback`： 回放地址
-- `live`： 直播地址，推流结束时为`null`
+- `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
 **失败**
 
@@ -660,7 +654,6 @@ Authorization: Basic Auth
 
 **参数**
 
-- `id`： `int`类型，频道id。可选
 - `owner`： `int`类型，频道属主id。可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
@@ -674,24 +667,14 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"stream": <stream>,
-			"playback": {
-				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
-			},
-			"live": {
-				"flv": "http://xxxxx/hub/stream-id.flv",
-  				"hls": "http:/xxxxx/hub/stream-id.m3u8",
-			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
-			}
+			"is_liked": <bool is_liked>
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `stream`： `stream`类型，本次创建的频道对应的流信息，定义见[这里](#stream-definition)
-- `playback`： 回放地址
-- `live`： 直播地址，推流结束时为`null`
+- `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
 **失败**
 
@@ -705,7 +688,7 @@ API_CHANNEL_NOT_FOUND
 **请求**
 
 ```
-GET /channels
+GET /channels/my
 Authorization: Basic Auth
 ```
 
@@ -724,24 +707,50 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"stream": <stream>,
-			"playback": {
-				"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
-			},
-			"playback": {
-				"flv": "http://xxxxx/hub/stream-id.flv",
-  				"hls": "http:/xxxxx/hub/stream-id.m3u8",
-			  	"rtmp": "rtmp://xxxxx/hub/stream-id"
-			}
+			"is_liked": <bool is_liked>
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `stream`： `stream`类型，本次创建的频道对应的流信息，定义见[这里](#stream-definition)
-- `playback`： 回放地址
-- `live`： 直播地址，推流结束时为`null`
+- `is_liked`： `bool`类型，当前用户是否已点赞该频道
+
+<a name="get-channel-info"></a>
+#### 获取指定频道详情
+**请求**
+
+```
+GET /channels/info
+Authorization: Basic Auth
+```
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+	"channel":{
+ 		"channel": <channel>,
+ 		"is_liked": <bool is_liked>,
+		"playback": {
+			"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
+		},
+		"playback": {
+			"flv": "http://xxxxx/hub/stream-id.flv",
+			"hls": "http:/xxxxx/hub/stream-id.m3u8",
+		  	"rtmp": "rtmp://xxxxx/hub/stream-id"
+		}
+	}
+}
+```
+
+- `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
+- `is_liked`： `bool`类型，当前用户是否已点赞该频道
+- `playback`： 回放地址，如果尚未结束推流，为`null`
+- `live`： 直播地址，如果不在推流中，为`null`
+
 
 **失败**
 
@@ -862,7 +871,7 @@ API_BAD_REQUEST
 - `API_BAD_REQUEST`： 当前用户已经对该频道点赞
 
 <a name="channel-dislike"></a>
-#### 频道点赞
+#### 取消频道点赞
 
 **请求**
 
