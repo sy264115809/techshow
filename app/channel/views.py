@@ -28,7 +28,7 @@ def create_channel():
     创建一个新的频道
     :return:
     """
-    rules=[
+    rules = [
         rule('title'),
         rule('quality'),
         rule('orientation')
@@ -214,6 +214,7 @@ def finish():
     id - 结束推流的频道id
     :return:
     """
+    stopped_at = datetime.now()
 
     q, bad = must_json_params(rule('id'))
     if bad:
@@ -229,7 +230,15 @@ def finish():
     if not channel.is_publishing:
         return bad_request('channel is not publishing')
 
-    channel.stopped_at = datetime.now()
+    duration = 0
+    start = mktime(channel.started_at.timetuple())
+    end = mktime(stopped_at.timetuple())
+    segments = _get_stream(channel.stream_id).segments(start_second = start, end_second = end)
+    for segment in segments:
+        duration += segment['end'] - segment['start']
+
+    channel.stopped_at = stopped_at
+    channel.duration = duration
     channel.owner.stream_status = USER.STREAM_AVAILABLE
     channel.status = CHANNEL.PUBLISHED
     db.session.commit()
