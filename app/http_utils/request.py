@@ -15,11 +15,11 @@ def rule(param, allow = None, must = True):
 
 def paginate():
     limit = request.args.get('l')
-    if limit is None or not limit > 0:
+    if not (isinstance(limit, int) and limit > 0):
         limit = 10
 
     page = request.args.get('p')
-    if page is None or not page >= 1:
+    if not (isinstance(page, int) and page >= 1):
         page = 1
 
     return page, limit, False
