@@ -1,12 +1,22 @@
-# coding=utf8
+# coding=utf-8
 from datetime import datetime
 from itsdangerous import JSONWebSignatureSerializer as Serializer
 
 from app import db
-from app.user import constants as USER
 
 from flask import current_app
 from flask_login import UserMixin
+
+
+class StreamStatus(object):
+    unborn = 0
+    unavailable = 1
+    available = 2
+
+
+class UserGender(object):
+    male = 0
+    female = 1
 
 
 class User(db.Model, UserMixin):
@@ -37,7 +47,7 @@ class User(db.Model, UserMixin):
     rong_cloud_token = db.Column(db.String(128))
 
     stream_id = db.Column(db.String(64))
-    stream_status = db.Column(db.Integer, default = USER.STREAM_UNBORN)
+    stream_status = db.Column(db.Integer, default = StreamStatus.unborn)
 
     get_auth_code_count = db.Column(db.Integer, default = 0)
     last_get_auth_code_at = db.Column(db.DateTime)
@@ -48,10 +58,10 @@ class User(db.Model, UserMixin):
 
     is_banned = db.Column(db.Boolean, default = False)
 
-    last_send_message_at = db.Column(db.DateTime, default = datetime.now())
+    last_send_message_at = db.Column(db.DateTime, default = datetime.now)
 
-    created_at = db.Column(db.DateTime, default = datetime.now())
-    updated_at = db.Column(db.DateTime, default = datetime.now(), onupdate = datetime.now())
+    created_at = db.Column(db.DateTime, default = datetime.now)
+    updated_at = db.Column(db.DateTime, default = datetime.now, onupdate = datetime.now)
 
     def __init__(self, **kwargs):
         self.get_auth_code_count = 0

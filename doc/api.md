@@ -68,7 +68,8 @@
 |`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的登录验证码|
 |`API_OAUTH_FAIL`|4012|oauth fail|OAuth登录失败|
 |`API_MAX_CHANNEL_TOUCHED`|4031|touch maximum number of channels|达到最大频道数量|
-|`API_CHANNEL_ACCESS_DENIED`|4033|channel in inaccessible status|频道不处于`推流中`或`结束推流`的[状态](#channel-status)|
+|`API_MESSAGE_TOO_FREQUENTLY`|4032|send meesage too frequently|发送消息频率太快|
+|`API_CHANNEL_INACCESSIBLE`|4033|channel is inaccessible|频道不处于`推流中`或`结束推流`的[状态](#channel-status)，不可访问|
 |`API_USER_NOT_FOUND`|4041|user not found|用户未找到|
 |`API_CHANNEL_NOT_FOUND`|4042|channel not found|频道未找到|
 
@@ -87,21 +88,25 @@
 - [用户相关](#api-user)
 	- [类型声明: user](#user-definition)
 	- [获取用户信息](#get-user-info)
-	- [获取当前用户信息](#get-my-info)
-	- [更新当前用户信息](#update-my-info)
+	- [获取我的用户信息](#get-my-info)
+	- [更新我的用户信息](#update-my-info)
 - [频道相关](#api-channel)
 	- [类型声明: channel](#channel-definition)
 	- [类型声明: stream](#stream-definition)
 	- [创建频道](#create-channel)
-	- [获取直播频道信息](#get-live-channels)
-	- [获取回放频道信息](#get-playback-channels)
+	- [获取直播频道列表](#get-live-channels)
+	- [获取回放频道列表](#get-playback-channels)
 	- [获取我的频道列表](#get-my-channels)
-	- [获取指定频道信息](#get-channel-info)
+	- [访问指定频道](#access-channel)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
 	- [频道点赞](#channel-like)
 	- [频道取消点赞](#channel-dislike)
 	- [投诉频道](#send-channel-complain)
+- [消息相关](#api-message)
+	- [类型声明: message](#message-definition)
+	- [发送消息](#send-message)
+	- [获取频道中的消息](#get-channel-messages)
 
 ---
 
@@ -110,7 +115,7 @@
 > - `v1.0.1`仅支持使用[Github OAuth](#github-oauth)或[Qiniu OAuth](#qiniu-oauth)的方式登陆。
 
 <a name='get_auth_code'></a>
-#### 获取手机验证码
+####  获取手机验证码
 > `v1.0.1`该接口不使用
 
 一个用户一次请求所获得的一个验证码，在**十分钟内有效**。
@@ -120,7 +125,7 @@
 ```
 GET /users/login/mobile/code?mobile=<mobile>
 ```
-- `mobile` 用户的手机号
+- `mobile` `string`类型，用户的手机号，必选
 
 **成功**
 
@@ -143,7 +148,7 @@ API_BAD_REQUEST
 - `mobile`格式不正确，无法获取手机验证码
 
 <a name='login_by_mobile'></a>
-#### 根据手机号码登录
+####  根据手机号码登录
 > `v1.0.1`该接口不使用
 
 **请求**
@@ -165,19 +170,17 @@ Content-Type: application/json
 
 ```
 {
-  "code": 2000, 
-  "desc": "ok", 
-  "api_token": <string api_token>, 
-  "mobile": <string mobile>,
-  "id": <int id>,
+  "code": 2000,
+  "desc": "ok",
+  "user": <user user>,
+  "api_token": <string api_token>,
   "rong_cloud_token": <string rong_cloud_token>
 }
 ```
 表示用户通过验证，此时请求中的`auth_code`过期作废。
 
+- `user`： `user`类型（[定义](#user-definition)），当前用户
 - `api_token`： `string`类型，用户本次[生命周期](#token-life-circle)中用于[鉴权](#authentication)的秘钥
-- `mobile`：`string`类型，用户登录使用的手机号码
-- `id`： `int`类型，用户的id
 - `rong_cloud_token`： `int`类型，融云的token
 
 **失败**
@@ -188,7 +191,7 @@ API_INVALID_AUTH_CODE
 错误的验证码。
 
 <a name="github-oauth"></a>
-#### Github OAuth方式登录
+####  Github OAuth方式登录
 
 客户端应使用`WebView`请求本 API，请求后会跳转到 **Github** 的 **OAuth** 登录页面供用户登录，用户操作后会产生响应结果。
 
@@ -212,7 +215,7 @@ API_OAUTH_FAIL
 ```
 
 <a name="qiniu-oauth"></a>
-#### Qiniu OAuth方式登录
+####  Qiniu OAuth方式登录
 
 客户端应使用`WebView`请求本 API，请求后会跳转到 **Qiniu Portal** 的 **OAuth** 登录页面供用户登录，用户操作后会产生响应结果。
 
@@ -236,7 +239,7 @@ API_OAUTH_FAIL
 ```
 
 <a name="login"></a>
-#### 登录
+####  登录
 **请求**
 
 ```
@@ -256,14 +259,14 @@ Content-Type: application/json
 {
   "code": 2000, 
   "desc": "ok", 
-  "api_token": <string api_token>, 
   "user": <user user>,
+  "api_token": <string api_token>, 
   "rong_cloud_token": <string rong_cloud_token>
 }
 ```
 
-- `api_token`： `string`类型，用户本次[生命周期](#token-life-circle)中用于[鉴权](#authentication)的秘钥
 - `user`： `user`类型（[定义](#user-definition)），当前用户
+- `api_token`： `string`类型，用户本次[生命周期](#token-life-circle)中用于[鉴权](#authentication)的秘钥
 - `rong_cloud_token`： `int`类型，融云的token
 
 **失败**
@@ -274,7 +277,7 @@ API_INVALID_AUTH_CODE
 ```
 
 <a name="logout"></a>
-#### 登出
+####  登出
 **请求**
 
 ```
@@ -290,14 +293,12 @@ Authorization: Basic Auth
 	"desc": "ok"
 }
 ```
-登出成功。
 
 **失败**
 
 ```
 API_UNAUTHORIZED
 ```
-未带授权，登出失败。
 
 ----
 
@@ -305,26 +306,26 @@ API_UNAUTHORIZED
 ### 用户相关
 
 <a name="user-definition"></a>
-#### 类型声明：`user`
+####  类型声明：`user`
 在返回结果中，`user`的格式如下：
 
 ```
 {
-	 "id": <int id>,
-	 "name": <string name>,
-	 "nickname": <strng nickname>,
-	 "bio": <string bio>,
-	 "gender": <int gender>,
-	 "email": <string email>,
-	 "mobile": <string mobile>,
-	 "avatar": <string avatar>,
-    "qiniu_name": <string qiniu_name>,
-    "qiniu_email": <string qiniu_email>,
-    "github_login": <string github_login>,
-    "github_name": <string github_name>,
-    "github_email": <string github_email>,
-    "is_banned": <int is_banned>,
-    "stream_status" <int stream_status>:
+	"id": <int id>,
+	"name": <string name>,
+	"nickname": <strng nickname>,
+	"bio": <string bio>,
+	"gender": <int gender>,
+	"email": <string email>,
+	"mobile": <string mobile>,
+	"avatar": <string avatar>,
+	"qiniu_name": <string qiniu_name>,
+	"qiniu_email": <string qiniu_email>,
+	"github_login": <string github_login>,
+	"github_name": <string github_name>,
+	"github_email": <string github_email>,
+	"is_banned": <int is_banned>,
+	"stream_status" <int stream_status>:
 }
 ```
 - `id`： `int`类型，用户id
@@ -353,18 +354,16 @@ API_UNAUTHORIZED
 	- `2`：用户的流可用（可以新建频道）
 
 <a name="get-user-info"></a>
-#### 获取用户信息
+####  获取用户信息
 **请求**
 
 ```
-GET /users
+GET /users?id=<id>&nickname=<nickname>&p=<p>&l=<l>
 Authorization: Basic Auth
 ```
- 
-**参数**
 
-- `id`： `int`类型，用户id。可选
-- `nickname`： `int`类型，用户昵称。可选
+- `id`： `int`类型，用户id，可选
+- `nickname`： `string`类型，用户昵称，可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 
@@ -392,15 +391,13 @@ API_USER_NOT_FOUND
 ```
 
 <a name="get-my-info"></a>
-#### 获取我的用户信息
+####  获取我的用户信息
+**请求**
 
 ```
-POST /users/my
+GET /users/my
 Authorization: Basic Auth
-Content-Type: application/json
 ```
-
-
 
 **成功**
 
@@ -421,11 +418,12 @@ API_UNAUTHORIZED
 ```
 
 <a name="update-my-info"></a>
-#### 更新当前用户信息
+####  更新我的用户信息
 
 ```
-GET /users
+POST /users/my
 Authorization: Basic Auth
+Content-Type: application/json
 
 {
     "avatar": <string avatar>,
@@ -434,12 +432,11 @@ Authorization: Basic Auth
     "bio": <string bio>
 }
 ```
-**参数**
 
-- `avatar`：`string`类型，用户头像
-- `nickname`： `string`类型，用户昵称
-- `gender`： `int`类型，用户性别（[定义](#user-definition-gender)）
-- `bio`： `string`类型，用户简介
+- `avatar`：`string`类型，用户头像，可选
+- `nickname`： `string`类型，用户昵称，可选
+- `gender`： `int`类型，用户性别（[定义](#user-definition-gender)），可选
+- `bio`： `string`类型，用户简介，可选
 
 **成功**
 
@@ -467,7 +464,7 @@ API_BAD_REQUEST
 ### 频道相关
 
 <a name="channel-definition"></a>
-#### 类型声明：`channel`
+####  类型声明：`channel`
 在返回结果中，`channel`的格式如下：
 
 ```
@@ -480,7 +477,7 @@ API_BAD_REQUEST
   	"orientation": <int orientation>,
   	"quality": <int quality>,
   	"status": <int status>,
-  	"owner": <user>,
+  	"owner": <user owner>,
   	"visit_count": <int visit_count>,
   	"like_count": <int like_count>,
 	"started_at": <timestamp statred_at>,
@@ -511,6 +508,7 @@ API_BAD_REQUEST
 
 <a name="channel-status"></a>
 **频道状态**
+
 在目前的设计（v1.0.1）中，频道有五种可能的状态：
 
 - `initiate`： 新建状态，这时用户还没有提起推流请求。一个用户只可能拥有至多一个处于`initiate`状态的频道，一旦一个频道被新建了但是没有进行推流，它将会在下一个新建频道的请求到来后被删除。
@@ -524,44 +522,44 @@ API_BAD_REQUEST
 - `banned`：禁止状态。管理员可以禁止用户的频道，被禁止的频道将会被强制中断直播（如果处于`publishing`状态），并且不能被回放。
 
 <a name="stream-definition"></a>
-#### 类型声明：`stream`
+####  类型声明：`stream`
 `stream`是由 *pili* 服务器返回的模型。在返回结果中，`stream`的格式形如：
 
 ```
 {
 	"createdAt": "2015-12-23T16:23:33.086+08:00",
-    "disabled": false,
-    "disabledTill": 0,
-    "hosts": {
-    	"live": {
-       	"hdl": "pili-live-hdl.live.golanghome.com",
-       	"hls": "pili-live-hls.live.golanghome.com",
-       	"http": "pili-live-hls.live.golanghome.com",
-       	"rtmp": "pili-live-rtmp.live.golanghome.com"
-    	},
-    	"play": {
-    		"http": "pili-live-hls.live.golanghome.com",
-     		"rtmp": "pili-live-rtmp.live.golanghome.com"
-    	},
-    	"playback": {
-    		"hls": "pili-playback.live.golanghome.com",
-    		"http": "pili-playback.live.golanghome.com"
-    	},
-    	"publish": {
-    		"rtmp": "pili-publish.live.golanghome.com"
-    	}
-    },
-    "hub": "jinxinxin",
-    "id": "z1.jinxinxin.567a5a05d409d266f3000003",
-    "publishKey": "7a2f7f10cab7a706",
-    "publishSecurity": "static",
-    "title": "567a5a05d409d266f3000003",
-    "updatedAt": "2015-12-23T16:23:33.086+08:00"
+	"disabled": false,
+	"disabledTill": 0,
+	"hosts": {
+		"live": {
+			"hdl": "pili-live-hdl.live.golanghome.com",
+			"hls": "pili-live-hls.live.golanghome.com",
+			"http": "pili-live-hls.live.golanghome.com",
+			"rtmp": "pili-live-rtmp.live.golanghome.com"
+		},
+		"play": {
+			"http": "pili-live-hls.live.golanghome.com",
+			"rtmp": "pili-live-rtmp.live.golanghome.com"
+		},
+		"playback": {
+			"hls": "pili-playback.live.golanghome.com",
+			"http": "pili-playback.live.golanghome.com"
+		},
+		"publish": {
+			"rtmp": "pili-publish.live.golanghome.com"
+		}
+	},
+	"hub": "jinxinxin",
+	"id": "z1.jinxinxin.567a5a05d409d266f3000003",
+	"publishKey": "7a2f7f10cab7a706",
+	"publishSecurity": "static",
+	"title": "567a5a05d409d266f3000003",
+	"updatedAt": "2015-12-23T16:23:33.086+08:00"
 }
 ```
 
 <a name="create-channel"></a>
-#### 创建频道
+####  创建频道
 **请求**
 
 ```
@@ -576,9 +574,9 @@ Content-Type: application/json
 }
 ```
 
-- `title`： `string`类型，频道的标题
-- `quality`： `int`类型，直播的清晰度
-- `orientation`： `int`类型，直播的屏幕方向
+- `title`： `string`类型，频道的标题，必选
+- `quality`： `int`类型，直播的清晰度，可选
+- `orientation`： `int`类型，直播的屏幕方向，可选
 
 **成功**
 
@@ -602,21 +600,16 @@ API_BAD_REQUEST
 API_MAX_CHANNEL_TOUCHED
 ```
 
-- `API_BAD_REQUEST`： 请检查`title`, `quality`, `orientation`是否在请求体中并格式正确。
-- `API_MAX_CHANNEL_TOUCHED`： 频道数达到管理员设置的最大频道数
-
 <a name="get-live-channels"></a>
-#### 获取直播频道信息
+####  获取直播频道列表
 **请求**
 
 ```
-GET /channels/live
+GET /channels/live?owner_id=<owner_id>&p=<p>&l=<l>
 Authorization: Basic Auth
 ```
 
-**参数**
-
-- `owner_id`： `int`类型，频道属主id。可选
+- `owner_id`： `int`类型，频道属主id，可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 
@@ -643,21 +636,18 @@ Authorization: Basic Auth
 ```
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
-API_CHANNEL_ACCESS_DENIED
 ```
 
 <a name="get-playback-channels"></a>
-#### 获取回放频道信息
+####  获取回放频道列表
 **请求**
 
 ```
-GET /channels/playback
+GET /channels/playback?owner_id=<owner_id>&p=<p>&l=<l>
 Authorization: Basic Auth
 ```
 
-**参数**
-
-- `owner_id`： `int`类型，频道属主id。可选
+- `owner_id`： `int`类型，频道属主id，可选
 - `p`： `int`类型，分页中的页数page，默认为`1`
 - `l`： `int`类型，分页中的限制limit，默认为`10`
 
@@ -687,15 +677,13 @@ API_CHANNEL_NOT_FOUND
 ```
 
 <a name="get-my-channels"></a>
-#### 获取我的频道列表
+####  获取我的频道列表
 **请求**
 
 ```
-GET /channels/my
+GET /channels/my?status=<status>&p=<p>&l=<l>
 Authorization: Basic Auth
 ```
-
-**参数**
 
 - `status`： `int`类型，频道状态。可选，可为任意[频道状态](#channel-status)
 - `p`： `int`类型，分页中的页数page，默认为`1`
@@ -719,14 +707,16 @@ Authorization: Basic Auth
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
 - `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
-<a name="get-channel-info"></a>
-#### 获取指定频道详情
+<a name="access-channel"></a>
+####  访问指定频道
 **请求**
 
 ```
-GET /channels/info
+POST /channels/access/<int id>
 Authorization: Basic Auth
 ```
+
+- `id`： `int`类型，要访问的频道id
 
 **成功**
 
@@ -760,25 +750,20 @@ Authorization: Basic Auth
 ```
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
+API_CHANNEL_INACCESSIBLE
 ```
 
 
 <a name="channel-publish"></a>
-#### 开始推流
-
+####  开始推流
 **请求**
 
 ```
-POST /channels/publish
+POST /channels/publish/<int id>
 Authorization: Basic Auth
-Content-Type: application/json
-
-{
-	"id": <int id>
-}
 ```
 
-- `id`： `int`类型，频道id。必须
+- `id`： `int`类型，要推流的频道id
 
 **成功**
 
@@ -801,21 +786,15 @@ API_BAD_REQUEST
 - `API_BAD_REQUEST`： 频道未处于`initiate`[状态](#channel-status)
 
 <a name="channel-finish"></a>
-#### 结束推流
-
+####  结束推流
 **请求**
 
 ```
-POST /channels/finish
+POST /channels/finish/<int id>
 Authorization: Basic Auth
-Content-Type: application/json
-
-{
-	"id": <int id>
-}
 ```
 
-- `id`： `int`类型，频道id。必须
+- `id`： `int`类型，要结束推流的频道id
 
 **成功**
 
@@ -838,21 +817,15 @@ API_BAD_REQUEST
 - `API_BAD_REQUEST`： 频道未处于`publishing`[状态](#channel-status)
 
 <a name="channel-like"></a>
-#### 频道点赞
-
+####  频道点赞
 **请求**
 
 ```
-POST /channels/like
+POST /channels/like/<int id>
 Authorization: Basic Auth
-Content-Type: application/json
-
-{
-	"id": <int id>
-}
 ```
 
-- `id`： `int`类型，频道id。必须
+- `id`： `int`类型，要点赞的频道id
 
 **成功**
 
@@ -869,26 +842,21 @@ Content-Type: application/json
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
+API_CHANNEL_INACCESSIBLE
 ```
 
 - `API_BAD_REQUEST`： 当前用户已经对该频道点赞
 
 <a name="channel-dislike"></a>
-#### 取消频道点赞
-
+####  取消频道点赞
 **请求**
 
 ```
-POST /channels/dislike
+POST /channels/dislike/<int id>
 Authorization: Basic Auth
-Content-Type: application/json
-
-{
-	"id": <int id>
-}
 ```
 
-- `id`： `int`类型，频道id。必须
+- `id`： `int`类型，要取消点赞的频道id
 
 **成功**
 
@@ -905,28 +873,27 @@ Content-Type: application/json
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
+API_CHANNEL_INACCESSIBLE
 ```
 
 - `API_BAD_REQUEST`： 当前用户并没有对该频道点赞
 
 <a name="send-channel-complain"></a>
-#### 举报频道
-
+####  举报频道
 **请求**
 
 ```
-POST /channels/complain
+POST /channels/complain/<int id>
 Authorization: Basic Auth
 Content-Type: application/json
 
 {
-	"id": <int id>,
 	"reason": <string reason>
 }
 ```
 
-- `id`： `int`类型，频道id。必须
-- `reason`： `string`类型，投诉理由。必须
+- `id`： `int`类型，要投诉的频道id
+- `reason`： `string`类型，投诉理由，必须
 
 **成功**
 
@@ -943,4 +910,91 @@ Content-Type: application/json
 API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
+API_CHANNEL_INACCESSIBLE
+```
+
+<a name="api-message"></a>
+### 消息相关
+
+<a name="message-definition"></a>
+####  类型声明 `message`
+在返回的结果中，`message`的格式如下：
+
+```
+
+```
+
+<a name="send-message"></a>
+####  发送消息
+**请求**
+
+```
+POST /channels/messages/<int id>
+Authorization: Basic Auth
+Content-Type: application/json
+
+{
+	"content": <string content>,
+	"offset": <int offset>
+}
+```
+
+- `id`： `int`类型，要发送消息的频道id
+- `content`： `string`类型，消息内容，必须
+- `offset`： `int`类型，当对应的频道处于`已结束推流`状态时，**必须**
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+API_CHANNEL_INACCESSIBLE
+API_MESSAGE_TOO_FREQUENTLY
+```
+
+<a name="get-channel-messages"></a>
+####  获取频道中的消息
+**请求**
+
+```
+GET /channels/messages/<int id>?s=<s>&o=<o>&l=<l>
+Authorization: Basic Auth
+```
+
+- `id`： `int`类型，要发送消息的频道id
+- `s`： `int`类型，相对频道开始直播时间的偏移，即要获得的消息列表在时间轴上的起始点，默认为`0`，单位秒
+- `o`： `int`类型，相对于`s`参数的偏移，默认为`10`，单位秒
+- `l`： `int`类型，要获取的消息条目限制，默认为`不限制`
+
+> 关于参数`o`和`s`的解释
+> 
+> 假设`o`=3，`s`=15，则它们组合起来的含义是：获取从相对于视频开始直播时间第3秒开始到第18(3+15)秒的消息
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+API_CHANNEL_INACCESSIBLE
+API_MESSAGE_TOO_FREQUENTLY
 ```

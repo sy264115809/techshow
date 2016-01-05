@@ -1,13 +1,26 @@
-# encoding=utf8
+# coding=utf-8
 from datetime import datetime
 from time import mktime
 
 from app import db
-from app.channel import constants as CHANNEL
 
-channel_user_like = db.Table('channel_user_like',
-                             db.Column('channel_id', db.Integer, db.ForeignKey('channel.id')),
-                             db.Column('user_id', db.Integer, db.ForeignKey('user.id')))
+
+class ChannelStatus(object):
+    """Channel Status Enum
+    """
+    initiate = 0
+    publishing = 1
+    published = 2
+    closed = 3
+    banned = 4
+
+
+# 点赞关联表
+channel_user_like = db.Table(
+        'channel_user_like',
+        db.Column('channel_id', db.Integer, db.ForeignKey('channel.id')),
+        db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
+)
 
 
 class Channel(db.Model):
@@ -17,7 +30,7 @@ class Channel(db.Model):
     desc = db.Column(db.String(255))
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     owner = db.relationship('User', backref = db.backref('channels'))
-    status = db.Column(db.Integer, default = CHANNEL.INITIATE)
+    status = db.Column(db.Integer, default = ChannelStatus.initiate)
 
     stream_id = db.Column(db.String(64))
 
@@ -31,7 +44,7 @@ class Channel(db.Model):
     started_at = db.Column(db.DateTime)
     stopped_at = db.Column(db.DateTime)
 
-    created_at = db.Column(db.DateTime, default = datetime.now())
+    created_at = db.Column(db.DateTime, default = datetime.now)
 
     liked_users = db.relationship('User',
                                   secondary = channel_user_like,
@@ -46,11 +59,11 @@ class Channel(db.Model):
 
     @property
     def is_published(self):
-        return self.status == CHANNEL.PUBLISHED
+        return self.status == ChannelStatus.published
 
     @property
     def is_publishing(self):
-        return self.status == CHANNEL.PUBLISHING
+        return self.status == ChannelStatus.publishing
 
     def like(self, user):
         if not self.is_like(user):

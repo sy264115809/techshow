@@ -1,22 +1,19 @@
-# coding=utf8
+# coding=utf-8
 import base64
 import random
+import json
+
 from datetime import datetime
 
-from flask import Blueprint, request, current_app, url_for, redirect, json, render_template
+from flask import Blueprint, current_app, request, url_for, redirect, render_template
 from flask_login import login_required, current_user
-from sqlalchemy import exc
 from rauth import OAuth2Service
 
 from app import db, login_manager
-from app.channel import constants as CHANNEL
-from app.channel.models import Channel
-from app.http_utils.response import success, bad_request, invalid_auth_code, user_not_found, oauth_fail, \
-    rong_cloud_failed, server_failed
-from app.http_utils.request import paginate, rule, query_params, json_params
-from app.rong_cloud import ApiClient, ClientError
-from app.user import constants as USER
-from app.user.models import User
+from app.models.user import User, UserGender
+from app.http.request import paginate, Rule, parse_params
+from app.http.response import success, InvalidAuthCode, UserNotFound, OAuthFail, RongCloudError
+from app.http.rong_cloud import ApiClient, ClientError
 
 users_endpoint = Blueprint('users', __name__, url_prefix = '/users')
 
@@ -25,18 +22,14 @@ AUTH_CODE_VALIDITY_SECONDS = 60 * 10
 
 @users_endpoint.route('/login/mobile/code', methods = ['GET'])
 def get_mobile_auth_code():
+    """获取手机验证码
+    支持的query params:
+    mobile - 必须, 手机号
     """
-    获取手机验证码
-    :return:
-    """
-    mobile = request.args.get('mobile')
-    if mobile is None:
-        return bad_request("missing arguments 'mobile'")
-
-    user = User.query.filter_by(mobile = mobile).first()
+    q = parse_params(request.args, Rule('mobile', must = True))
+    user = User.query.filter_by(**q).first()
     if user is None:
-        user = User(mobile = mobile)
-        user.get_auth_code_count = 0
+        user = User(**q)
 
     user.auth_code = _get_auth_code()
     user.get_auth_code_count += 1
@@ -51,67 +44,59 @@ def get_mobile_auth_code():
 
 @users_endpoint.route('/login/mobile', methods = ['POST'])
 def login_by_mobile():
+    """根据手机号及验证码登录
+    支持的json参数:
+    mobile - 必须, 手机号
+    auth_code - 必须, 验证码
     """
-    根据手机号及验证码登录
-    :return:
-    """
-    mobile = request.json.get('mobile')
-    if mobile is None:
-        return bad_request("missing arguments 'mobil'")
+    q = parse_params(
+            request.json,
+            Rule('mobile', must = True),
+            Rule('auth_code', must = True)
+    )
+    user = User.query.filter_by(**q).first()
+    if user is None:
+        raise InvalidAuthCode()
 
-    auth_code = request.json.get('auth_code')
-    if auth_code is None:
-        return bad_request("missing arguments 'auth_code'")
+    delta = (datetime.now() - user.last_get_auth_code_at).seconds
+    if delta > AUTH_CODE_VALIDITY_SECONDS:
+        raise InvalidAuthCode()
 
-    user = User.query.filter_by(mobile = mobile, auth_code = auth_code).first()
-    if user:
-        delta = datetime.now() - user.last_get_auth_code_at
-        if delta.seconds > AUTH_CODE_VALIDITY_SECONDS:
-            return invalid_auth_code()
+    user.auth_code = ''
+    user.get_auth_code_count = 0
+    user.rong_cloud_token = _get_rong_cloud_token(user)
+    user.login()
 
-        user.auth_code = ''
-        user.get_auth_code_count = 0
-        user.rong_cloud_token = _get_rong_cloud_token(user)
-        user.login()
-
-        return success({
-            'id': user.id,
-            'mobile': user.mobile,
-            'api_token': user.api_token,
-            'rong_cloud_token': user.rong_cloud_token
-        })
-    else:
-        return invalid_auth_code()
+    return success({
+        'user': user.to_json(),
+        'api_token': user.api_token,
+        'rong_cloud_token': user.rong_cloud_token
+    })
 
 
 @users_endpoint.route('/login/github', methods = ['GET'])
 def login_by_github():
+    """GitHub OAuth
     """
-    GitHub OAuth
-    :return:
-    """
-    redirect_uri = url_for('users.login_by_github_callback',
-                           next = request.args.get('next') or request.referrer or None,
-                           _external = True)
+    redirect_uri = url_for(
+            endpoint = 'users.login_by_github_callback',
+            next = request.args.get('next') or request.referrer or None,
+            _external = True
+    )
     return redirect(_github_oauth().get_authorize_url(redirect_uri = redirect_uri))
 
 
 @users_endpoint.route('/login/github/callback', methods = ['GET'])
 def login_by_github_callback():
+    """Github OAuth 回调
     """
-    Github OAuth 回调
-    :return:
-    """
-    code = request.args.get('code')
-    if code is None:
-        return bad_request('bad request')
-
+    code = parse_params(request.args, Rule('code', must = True))['code']
     try:
         data = dict(code = code)
         auth = _github_oauth().get_auth_session(data = data)
         info = auth.get('user').json()
     except Exception:
-        return oauth_fail()
+        raise OAuthFail()
 
     user = User.query.filter_by(github_id = info.get('id')).first()
     if user is None:
@@ -138,31 +123,27 @@ def login_by_github_callback():
 
 @users_endpoint.route('/login/qiniu', methods = ['GET'])
 def login_by_qiniu():
+    """Qiniu OAuth
     """
-    Qiniu OAuth
-    :return:
-    """
-    redirect_uri = url_for('users.login_by_qiniu_callback', next = request.args.get('next') or request.referrer or None,
-                           _external = True)
+    redirect_uri = url_for(
+            endpoint = 'users.login_by_qiniu_callback',
+            next = request.args.get('next') or request.referrer or None,
+            _external = True
+    )
     return redirect(_qiniu_oauth().get_authorize_url(redirect_uri = redirect_uri, response_type = 'code'))
 
 
 @users_endpoint.route('/login/qiniu/callback', methods = ['GET'])
 def login_by_qiniu_callback():
+    """Qiniu OAuth 回调
     """
-    Qiniu OAuth 回调
-    :return:
-    """
-    code = request.args.get('code')
-    if code is None:
-        return bad_request('bad request')
-
+    code = parse_params(request.args, Rule('code', must = True))['code']
     try:
         data = dict(code = code, grant_type = 'authorization_code')
         auth = _qiniu_oauth().get_auth_session(data = data, decoder = lambda c: json.loads(c))
         info = auth.get('info?access_token=' + auth.access_token).json().get('data')
     except Exception:
-        return oauth_fail()
+        raise OAuthFail()
 
     user = User.query.filter_by(qiniu_id = info.get('uid')).first()
     if user is None:
@@ -187,13 +168,14 @@ def login_by_qiniu_callback():
 
 @users_endpoint.route('/login', methods = ['POST'])
 def get_user_access_token():
-    code = request.json.get('auth_code')
-    if code is None:
-        return bad_request('missing argument "auth_code"')
-
-    user = User.query.filter_by(oauth_code = code).first()
+    """登录
+    支持的json参数:
+    auth_code - 必须, OAuth回调时url中附带的code
+    """
+    auth_code = parse_params(request.json, Rule('auth_code', must = True))['auth_code']
+    user = User.query.filter_by(oauth_code = auth_code).first()
     if user is None:
-        return invalid_auth_code()
+        raise InvalidAuthCode()
 
     user.oauth_code = ''
     user.rong_cloud_token = _get_rong_cloud_token(user)
@@ -208,9 +190,7 @@ def get_user_access_token():
 @users_endpoint.route('/logout', methods = ['POST'])
 @login_required
 def logout():
-    """
-    登出
-    :return:
+    """登出
     """
     current_user.api_token = ''
     db.session.add(current_user)
@@ -223,7 +203,7 @@ def logout():
 def get_rong_cloud_token():
     token = _get_rong_cloud_token()
     if token is None:
-        return rong_cloud_failed()
+        raise RongCloudError()
 
     current_user.rong_cloud_token = token
     db.session.commit()
@@ -236,26 +216,22 @@ def get_rong_cloud_token():
 @users_endpoint.route('', methods = ['GET'])
 @login_required
 def get_users_info():
-    """
-    按条件查询用户. 支持的query params:
-    id - 用户id
-    nickname - 用户昵称
-
-    l - 返回条目数量限制, 默认10
-    p - 返回条目的起始页, 默认1
+    """按条件查询用户.
+    支持的query params:
+    id - 可选, 用户id
+    nickname - 可选, 用户昵称
+    l - 可选, 返回条目数量限制, 默认10
+    p - 可选, 返回条目的起始页, 默认1
     :return:
     """
-    rules = [
-        rule('id'),
-        rule('nickname')
-    ]
-    q, bad = query_params(*rules)
-    if bad:
-        return bad_request(bad)
-
+    q = parse_params(
+            request.args,
+            Rule('id'),
+            Rule('nickname')
+    )
     users = User.query.filter_by(**q).paginate(*paginate()).items
     if len(users) == 0:
-        return user_not_found()
+        raise UserNotFound()
 
     res = list()
     for user in users:
@@ -270,75 +246,29 @@ def get_users_info():
 @users_endpoint.route('/my', methods = ['GET'])
 @login_required
 def get_my_info():
-    """
-    查询当前用户信息
-    :return:
+    """查询当前用户信息
     """
     return success({
         'user': current_user.to_json()
     })
 
 
-@users_endpoint.route('', methods = ['POST'])
+@users_endpoint.route('/my', methods = ['POST'])
 @login_required
 def update_user_info():
+    """更新当前用户信息
     """
-    更新当前用户信息
-    :return:
-    """
-    rules = [
-        rule('avatar'),
-        rule('nickname'),
-        rule('gender', allow = [USER.GENDER_MALE, USER.GENDER_FEMALE]),
-        rule('bio')
-    ]
-    q, bad = json_params(*rules)
-    if bad:
-        return bad_request(bad)
-
-    try:
-        User.query.filter_by(id = current_user.id).update(q)
-        db.session.commit()
-    except exc.SQLAlchemyError, e:
-        current_app.logger.error('update user info with error: ', e.message)
-        return server_failed()
-
+    q = parse_params(
+            request.json,
+            Rule('avatar'),
+            Rule('nickname'),
+            Rule('gender', allow = [UserGender.female, UserGender.male]),
+            Rule('bio')
+    )
+    User.query.filter_by(id = current_user.id).update(q)
+    db.session.commit()
     return success({
         'user': current_user.to_json()
-    })
-
-
-@users_endpoint.route('/<int:user_id>/channels/published', methods = ['GET'])
-@login_required
-def get_user_published_channels(user_id):
-    """
-    指定用户的所有已结束推送的channel(回放列表)
-    :param user_id:要查询的user的id
-    :type user_id:int
-    :return:
-    """
-    channels = Channel.query.filter_by(owner_id = user_id, status = CHANNEL.PUBLISHED).all()
-    published_channel_list = []
-    for channel in channels:
-        published_channel_list.append(channel.to_json())
-    return success({
-        'count': len(channels),
-        'published_channels': published_channel_list if len(published_channel_list) else None
-    })
-
-
-@users_endpoint.route('/<int:user_id>/channels/publishing', methods = ['GET'])
-@login_required
-def get_user_publishing_channel(user_id):
-    """
-    指定用户的当前正在推送(直播)的channel
-    :param user_id:要查询的user的id
-    :type user_id:int
-    :return:
-    """
-    channel = Channel.query.filter_by(owner_id = user_id, status = CHANNEL.PUBLISHING).first()
-    return success({
-        'publishing_channel': channel.to_json() if channel else None
     })
 
 
@@ -355,11 +285,6 @@ def load_user_from_request(request):
     api_token = request.authorization
     if api_token:
         api_token = api_token.username
-        try:
-            api_token = base64.b64decode(api_token)
-        except TypeError:
-            pass
-
         user = User.query.filter_by(api_token = api_token).first()
         if user:
             return user
@@ -373,16 +298,11 @@ def _get_auth_code():
 
 
 def _github_oauth():
-    return _oauth('github')
+    return OAuth2Service(**current_app.config['OAUTH_GITHUB'])
 
 
 def _qiniu_oauth():
-    return _oauth('qiniu')
-
-
-def _oauth(which):
-    settings = current_app.config['OAUTH'].get(which)
-    return OAuth2Service(**settings) if settings else None
+    return OAuth2Service(**current_app.config['OAUTH_QINIU'])
 
 
 def _get_rong_cloud_token(user):
@@ -392,5 +312,6 @@ def _get_rong_cloud_token(user):
                 name = user.nickname or user.name,
                 portrait_uri = user.avatar or 'https://avatars.githubusercontent.com/u/16420492'
         ).get('token')
-    except ClientError:
+    except ClientError, e:
+        current_app.logger.error('get rong cloud token with error: %s' % e)
         return None
