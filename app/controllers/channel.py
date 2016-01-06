@@ -331,11 +331,18 @@ def send_message(channel_id):
     if channel.is_publishing:
         # 如果正在推流,调用融云发送聊天室消息
         try:
+            msg = json.dumps({
+                'content': content,
+                'extra': {
+                    'name': current_user.nickname,
+                    'avatar': current_user.avatar
+                }
+            })
             ApiClient().message_chatroom_publish(
                     from_user_id = current_user.id,
                     to_chatroom_id = channel.id,
                     object_name = 'RC:TxtMsg',
-                    content = json.dumps({'content': content})
+                    content = msg
             )
         except ClientError, e:
             current_app.logger.info('user %d send message "%s" with error: %s', current_user.id, content, e)

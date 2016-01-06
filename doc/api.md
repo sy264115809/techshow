@@ -12,7 +12,7 @@
 #### `GET`
 一般在请求服务器资源时使用。
 
-包含参数时,参数一律以 **Query String** 的形式传递，示例可参考**[请求手机验证码](#get_auth_code)** API。
+包含参数时,参数一律以 **Query String** 的形式传递，示例可参考**[获取我的信息](#get-user-info)** API。
 
 #### `POST`
 一般在操作服务器资源时使用。
@@ -730,7 +730,7 @@ Authorization: Basic Auth
 		"playback": {
 			"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
 		},
-		"playback": {
+		"live": {
 			"flv": "http://xxxxx/hub/stream-id.flv",
 			"hls": "http:/xxxxx/hub/stream-id.m3u8",
 		  	"rtmp": "rtmp://xxxxx/hub/stream-id"
@@ -921,8 +921,27 @@ API_CHANNEL_INACCESSIBLE
 在返回的结果中，`message`的格式如下：
 
 ```
-
+{
+	"id": <int id>,
+	"content": <string content>,
+	"offset": <int offset>,
+	"author": {
+		"id": <int user_id>,
+		"nickname": <string nickname>,
+		"avatar": <string avatra>
+	},
+	"channel_id": <int channel_id>
+}
 ```
+
+- `id`，`int`类型，消息的id
+- `content`， `string`类型，消息内容
+- `offset`， `int`类型，相对于频道开始时间的偏移，单位秒
+- `author`，发送消息的用户基本信息
+	- `user_id`， `int`类型，用户的id
+	- `nickname`， `string`类型，用户的昵称
+	- `avatar`， `string`类型，用户的头像url
+- `channel_id`， `int`类型，消息归属的频道id
 
 <a name="send-message"></a>
 ####  发送消息
@@ -951,6 +970,18 @@ Content-Type: application/json
 	"desc": "ok",
 }
 ```
+
+如果频道处于直播状态，发送的消息的`extra`中还会包含用户名称和头像信息，格式如下：
+
+```
+{
+	"name": <string name>,
+	"avatar": <string avatar>
+}
+```
+
+- `name`： `string`类型，消息发送者的名称
+- `avatar`： `string`类型，消息发送者的头像url
 
 **失败**
 
