@@ -80,8 +80,10 @@ def block_channel(channel_id):
 def release_channel(channel_id):
     channel = Channel.query.get(channel_id)
     if channel and channel.is_banned:
-        channel.status = ChannelStatus.published
+        stream = get_stream(channel.stream_id)
+        stream.enable()
 
+        channel.status = ChannelStatus.published
         db.session.commit()
     else:
         abort(403)
