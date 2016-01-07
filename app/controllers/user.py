@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 from flask import Blueprint, current_app, request, url_for, redirect, render_template
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, login_user
 from rauth import OAuth2Service
 
 from app import db, login_manager
@@ -118,6 +118,11 @@ def login_by_github_callback():
     user.oauth_code = code
     db.session.commit()
 
+    # if user is admin, login it and redirect to admin index
+    if user.github_email in current_app.config['ADMIN_GITHUB']:
+        login_user(user)
+        return redirect(url_for('admin.admin_index'))
+
     return render_template('login.html')
 
 
@@ -162,6 +167,11 @@ def login_by_qiniu_callback():
     # update oauth_code
     user.oauth_code = code
     db.session.commit()
+
+    # if user is admin, login it and redirect to admin index
+    if user.qiniu_email in current_app.config['ADMIN_QINIU']:
+        login_user(user)
+        return render_template(url_for('admin.admin_index'))
 
     return render_template('login.html')
 
@@ -291,6 +301,11 @@ def load_user_from_request(request):
 
     # finally, return None if both methods did not login the user
     return None
+
+
+@login_manager.user_loader
+def load_user_from_session(user_id):
+    return User.query.get(user_id)
 
 
 def _get_auth_code():

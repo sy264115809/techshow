@@ -43,6 +43,8 @@ def create_app(config):
     app.register_blueprint(users_endpoint)
     from app.controllers.channel import channels_endpoint
     app.register_blueprint(channels_endpoint)
+    from app.controllers.admin import admin_endpoint
+    app.register_blueprint(admin_endpoint)
 
     # error handler
     app.register_error_handler(APIException, lambda e: exception(e))

@@ -1,0 +1,35 @@
+{% from "admin/base/html_utils.html" import css_file, js_file, render_pagination %}
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechShow Admin {% block title %}{% endblock %}</title>
+
+    {{ css_file("css/bootstrap.min.css") }}
+    {{ css_file("css/font-awesome.min.css") }}
+    {{ css_file("css/animate.css") }}
+    {{ css_file("css/style.css") }}
+    {#  plugins css  #}
+    {{ css_file("css/plugins/sweetalert/sweetalert.css") }}
+
+
+    {% block css %}{% endblock %}
+</head>
+<body class="skin {% block bodyClass %}{% endblock %}">
+{% block body %}
+{% endblock %}
+{{ js_file("js/jquery-2.1.1.js") }}
+{{ js_file("js/bootstrap.min.js") }}
+{# plugins #}
+{{ js_file("js/plugins/toastr/toastr.min.js") }}
+{{ js_file("js/plugins/metisMenu/jquery.metisMenu.js") }}
+{{ js_file("js/plugins/slimscroll/jquery.slimscroll.js") }}
+{{ js_file("js/plugins/sweetalert/sweetalert.min.js") }}
+{# project basic js #}
+{{ js_file("js/techshow.js") }}
+
+{# Other custom js file #}
+{% block js %}{% endblock %}
+</body>
+</html>

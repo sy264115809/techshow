@@ -1,0 +1,59 @@
+{% extends 'admin/base/base.html' %}
+
+{% block bodyClass %}top-navigation{% endblock %}
+
+{% block body %}
+
+    <div id="wrapper">
+        <div id="page-wrapper" class="gray-bg">
+            <div class="row border-bottom white-bg">
+                <nav class="navbar navbar-static-top" role="navigation">
+                    <div class="navbar-header">
+                        <button aria-controls="navbar" aria-expanded="false" data-target="#navbar"
+                                data-toggle="collapse"
+                                class="navbar-toggle collapsed" type="button">
+                            <i class="fa fa-reorder"></i>
+                        </button>
+                        <a href="#" class="navbar-brand">TechShow Admin</a>
+                    </div>
+                    <div class="navbar-collapse collapse" id="navbar">
+                        <ul class="nav navbar-nav">
+                            <li>
+                                <a aria-expanded="false" role="button" href="{{ url_for('admin.channel_index') }}">频道</a>
+                            </li>
+                            <li>
+                                <a aria-expanded="false" role="button" href="{{ url_for('admin.user_index') }}">用户</a>
+                            </li>
+                            <li class="dropdown">
+                                <a aria-expanded="false" role="button" href="#" class="dropdown-toggle"
+                                   data-toggle="dropdown"> Menu item <span class="caret"></span></a>
+                                <ul role="menu" class="dropdown-menu">
+                                    <li><a href="">Menu item</a></li>
+                                    <li><a href="">Menu item</a></li>
+                                    <li><a href="">Menu item</a></li>
+                                    <li><a href="">Menu item</a></li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <ul class="nav navbar-top-links navbar-right">
+                            <li>
+                                <img alt="image" class="img-circle" src="{{ current_user.avatar }}" width="36"/>
+                                <span class="font-bold">{{ current_user.nickname }}</span>
+                            </li>
+                            <li>
+                                <a href="{{ url_for('admin.admin_logout') }}">
+                                    <i class="fa fa-sign-out"></i> 登出
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+            <div class="wrapper wrapper-content">
+                {% block content %}
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

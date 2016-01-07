@@ -13,7 +13,7 @@ from app.models.message import Message
 from app.models.setting import Setting, SETTING_MAX_CHANNEL_NUMS, SETTING_SEND_MESSAGE_FREQUENCY
 from app.http.request import paginate, Rule, parse_params, parse_int
 from app.http.response import success, MaxChannelTouched, ChannelNotFound, ChannelInaccessible, Unauthorized, \
-    BadRequest, RongCloudError, MessageTooFrequently
+    BadRequest, MessageTooFrequently
 from app.http.pili_service import get_stream, create_dynamic_stream
 from app.http.rong_cloud import ApiClient, ClientError
 
@@ -164,7 +164,7 @@ def publish(channel_id):
     """
 
     channel = _get_channel(channel_id, must_owner = True)
-    if channel.status != ChannelStatus.initiate:
+    if not channel.is_new:
         raise BadRequest('channel is not at initiate status')
 
     # 将其他正在使用该stream进行直播的房间设置为推流完毕

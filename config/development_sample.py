@@ -40,3 +40,10 @@ class DevelopmentConfig(Config):
     SETTING_MAX_CHANNEL_NUMS = 50
     # 用户发送消息的最小间隔
     SETTING_SEND_MESSAGE_FREQUENCY = 3
+
+    ADMIN_QINIU = [
+        
+    ]
+    ADMIN_GITHUB = [
+
+    ]

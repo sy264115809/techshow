@@ -58,12 +58,24 @@ class Channel(db.Model):
         super(Channel, self).__init__(**kwargs)
 
     @property
-    def is_published(self):
-        return self.status == ChannelStatus.published
+    def is_new(self):
+        return self.status == ChannelStatus.initiate
 
     @property
     def is_publishing(self):
         return self.status == ChannelStatus.publishing
+
+    @property
+    def is_published(self):
+        return self.status == ChannelStatus.published
+
+    @property
+    def is_closed(self):
+        return self.status == ChannelStatus.closed
+
+    @property
+    def is_banned(self):
+        return self.status == ChannelStatus.banned
 
     def like(self, user):
         if not self.is_like(user):
