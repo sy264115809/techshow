@@ -245,7 +245,7 @@ def stream_status(channel_id):
     stream = get_stream(channel.stream_id)
     return success({
         'disabled': stream.disabled,
-        'status': stream.status()
+        'status': stream.status()['status']
     })
 
 
