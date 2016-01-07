@@ -1,5 +1,5 @@
 # coding=utf-8
-
+from random import randint, sample
 from datetime import datetime
 from time import mktime
 
@@ -234,6 +234,21 @@ def finish(channel_id):
     return success()
 
 
+@channels_endpoint.route('/stream/<int:channel_id>', methods = ['GET'])
+@login_required
+def stream_status(channel_id):
+    """查询留状态
+    :param channel_id: 查询流状态的频道id
+    :type channel_id: int
+    """
+    channel = _get_channel(channel_id)
+    stream = get_stream(channel.stream_id)
+    return success({
+        'disabled': stream.disabled,
+        'status': stream.status()
+    })
+
+
 @channels_endpoint.route('/like/<int:channel_id>', methods = ['POST'])
 @login_required
 def like(channel_id):
@@ -392,6 +407,62 @@ def get_channel_messages(channel_id):
         'offset': offset,
         'limit': limit
     })
+
+
+@channels_endpoint.route('/mock/sendmsg', methods = ['GET'])
+def send_mock_msg():
+    channel_id = int(request.args.get('id'))
+    cnt = int(request.args.get('cnt'))
+    infos = [
+        {'nickname': 'sy264115809',
+         'avatar': 'https://avatars.githubusercontent.com/u/6114462?v=3'},
+        {'nickname': 'MistyL',
+         'avatar': 'https://avatars.githubusercontent.com/u/16283083?v=3'},
+        {'nickname': 'Kivenhaoyu',
+         'avatar': 'https://avatars.githubusercontent.com/u/8874808?v=3'},
+        {'nickname': '俞杰',
+         'avatar': 'https://avatars2.githubusercontent.com/u/6002026?v=3&s=400'},
+        {'nickname': '付业成',
+         'avatar': 'https://avatars0.githubusercontent.com/u/91730?v=3&s=400'},
+        {'nickname': '杜晓东',
+         'avatar': 'https://avatars0.githubusercontent.com/u/6927481?v=3&s=400'},
+        {'nickname': '杜晓峰',
+         'avatar': 'https://avatars0.githubusercontent.com/u/1694541?v=3&s=400'},
+        {'nickname': '郑李新',
+         'avatar': 'https://avatars2.githubusercontent.com/u/1264747?v=3&s=400'},
+        {'nickname': '袁晓沛',
+         'avatar': 'https://avatars2.githubusercontent.com/u/739343?v=3&s=400'}
+    ]
+
+    if channel_id is None or cnt is None:
+        raise BadRequest('missing argument id or cnt')
+    else:
+        ok = 0
+        for i in range(0, cnt):
+            user_id = randint(1, 9)
+            amount = randint(1, 25)
+            content = ''.join(sample('AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789', amount))
+            try:
+                msg = json.dumps({
+                    'content': content,
+                    'extra': {
+                        'name': infos[user_id - 1]['nickname'],
+                        'avatar': infos[user_id - 1]['avatar']
+                    }
+                })
+                ApiClient().message_chatroom_publish(
+                        from_user_id = user_id,
+                        to_chatroom_id = channel_id,
+                        object_name = 'RC:TxtMsg',
+                        content = msg
+                )
+                ok += 1
+            except ClientError, e:
+                # current_app.logger.info('user %d send message "%s" with error: %s', current_user.id, content, e)
+                pass
+        return success({
+            'send': ok
+        })
 
 
 def _assemble_channel(channel, need_url = True):

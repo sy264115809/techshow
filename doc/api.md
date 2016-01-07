@@ -100,9 +100,11 @@
 	- [访问指定频道](#access-channel)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
+	- [对应频道的流状态](#channel-stream-status)
 	- [频道点赞](#channel-like)
 	- [频道取消点赞](#channel-dislike)
 	- [投诉频道](#send-channel-complain)
+	- [分享频道](#share-channel)
 - [消息相关](#api-message)
 	- [类型声明: message](#message-definition)
 	- [发送消息](#send-message)
@@ -821,6 +823,39 @@ API_BAD_REQUEST
 - `API_UNAUTHORIZED`： 如果请求的用户和申请结束推流频道的所有者不是同一人，也会返回未授权。
 - `API_BAD_REQUEST`： 频道未处于`publishing`[状态](#channel-status)
 
+<a name="channel-stream-status"></a>
+####  对应频道的流状态
+**请求**
+
+```
+POST /channels/stream/<int id>
+Authorization: Basic Auth
+```
+
+- `id`： `int`类型，要查询流信息的频道id
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+	"disable": <bool disable>,
+	"status": <string status>
+}
+```
+
+- `disable`， `bool`类型，表示流是否被禁止
+- `status`， `string`类型，`connected` | `disconnected`
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
+
 <a name="channel-like"></a>
 ####  频道点赞
 **请求**
@@ -917,6 +952,13 @@ API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
 API_CHANNEL_INACCESSIBLE
 ```
+
+<a name="share-channel"></a>
+####  分享频道
+
+**分享url**
+
+`/channels/share/<int channel_id>`
 
 <a name="api-message"></a>
 ### 消息相关
