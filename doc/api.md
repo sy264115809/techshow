@@ -469,42 +469,65 @@ API_BAD_REQUEST
 
 ```
 {
-	"id": <int id>,
-	"title": <string title>,
-	"thumbnail": <string thumbnail>,
-	"desc": <string desc>,
-  	"duration": <int duration>,
-  	"orientation": <int orientation>,
-  	"quality": <int quality>,
-  	"status": <int status>,
-  	"owner": <user owner>,
-  	"visit_count": <int visit_count>,
-  	"like_count": <int like_count>,
-	"started_at": <timestamp statred_at>,
-  	"stopped_at": <timestamp stopped_at>,
-  	"created_at": <timestamp created_at>
-}
+	"channel":{
+		"id": <int id>,
+		"title": <string title>,
+		"thumbnail": <string thumbnail>,
+		"desc": <string desc>,
+	  	"duration": <int duration>,
+	  	"orientation": <int orientation>,
+	  	"quality": <int quality>,
+	  	"status": <int status>,
+	  	"owner": <user owner>,
+	  	"visit_count": <int visit_count>,
+	  	"like_count": <int like_count>,
+		"started_at": <timestamp statred_at>,
+	  	"stopped_at": <timestamp stopped_at>,
+	  	"created_at": <timestamp created_at>
+	},
+	"is_liked": <bool is_liked>,
+	"live_time": <int live_time>,
+	"online_nums": <int online_nums>,
+	"playback": {
+		"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
+	},
+	"live": {
+		"flv": "http://xxxxx/hub/stream-id.flv",
+		"hls": "http:/xxxxx/hub/stream-id.m3u8",
+	  	"rtmp": "rtmp://xxxxx/hub/stream-id"
+	}
+
 ```
 
-- `id`： `int`类型，频道id
-- `title`： `string`类型，频道标题
-- `thumbnail`： `string`类型，频道缩略图对应url
-- `desc`： `string`类型，频道描述
-- `duration`： `int`类型，频道的持续时间，单位秒。未结束时为None
-- `orientation`： `int`类型，屏幕方向，由前端给出
-- `quality`： `ini`类型，画质，由前端给出
-- `status`： `int`类型，[频道状态](#channel-status)<a name="channel-status-definition"></a>
-	- `0`：新建，尚未推流
-	- `1`：推流中
-	- `2`：已结束推流
-	- `3`：关闭（由频道拥有者操作）
-	- `4`：禁止（由管理员操作）
-- `owner`：`user`类型（[定义](#user-definition)），频道的拥有者
-- `visit_count`： `int`类型，当前频道被点击的数目
-- `like_count`： `int`类型，当前频道被点赞的数目
-- `started_at`： `timestamp`类型，开始推流的时间
-- `stopped_at`： `timestamp`类型，结束推流的时间
-- `created_at`： `timestamp`类型，频道创建的时间
+- `channel`： 频道的基本信息
+	- `id`： `int`类型，频道id
+	- `title`： `string`类型，频道标题
+	- `thumbnail`： `string`类型，频道缩略图对应url
+	- `desc`： `string`类型，频道描述
+	- `duration`： `int`类型，频道的持续时间，单位秒。未结束时为None
+	- `orientation`： `int`类型，屏幕方向，由前端给出
+	- `quality`： `ini`类型，画质，由前端给出
+	- `status`： `int`类型，[频道状态](#channel-status)<a name="channel-status-definition"></a>
+		- `0`：新建，尚未推流
+		- `1`：推流中
+		- `2`：已结束推流
+		- `3`：关闭（由频道拥有者操作）
+		- `4`：禁止（由管理员操作）
+	- `owner`：`user`类型（[定义](#user-definition)），频道的拥有者
+	- `visit_count`： `int`类型，当前频道被点击的数目
+	- `like_count`： `int`类型，当前频道被点赞的数目
+	- `started_at`： `timestamp`类型，开始推流的时间
+	- `stopped_at`： `timestamp`类型，结束推流的时间
+	- `created_at`： `timestamp`类型，频道创建的时间
+- `is_liked`： `bool`类型，当前用户是否已点赞该频道
+- `live_time`： `int`类型，从直播开始到现在过去的秒数，如果不在直播中，为`null`
+- `online_nums`： `int`类型，当前观看直播的人数，如果不在直播中，为`null`
+
+以下参数仅在调用[访问指定频道](#access-channel)时会取到有效值，否则皆为`null`
+
+- `playback`： 回放地址，如果仍在直播中，为`null`
+- `live`： 直播地址，如果不在直播中，为`null`
+
 
 <a name="channel-status"></a>
 **频道状态**
@@ -622,14 +645,13 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"is_liked": <bool is_liked>
+	 		...
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
 **失败**
 
@@ -660,14 +682,13 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"is_liked": <bool is_liked>
+			...
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
 **失败**
 
@@ -698,14 +719,13 @@ Authorization: Basic Auth
 	"channels":[
 		{
 	 		"channel": <channel>,
-			"is_liked": <bool is_liked>
+			...
 		}
 	]
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `is_liked`： `bool`类型，当前用户是否已点赞该频道
 
 <a name="access-channel"></a>
 ####  访问指定频道
@@ -724,26 +744,11 @@ Authorization: Basic Auth
 {
 	"code": 2000,
 	"desc": "ok",
-	"channel":{
- 		"channel": <channel>,
- 		"is_liked": <bool is_liked>,
-		"playback": {
-			"hls": "xxxxx/hub/stream-id.m3u8?start=t&end=t"
-		},
-		"live": {
-			"flv": "http://xxxxx/hub/stream-id.flv",
-			"hls": "http:/xxxxx/hub/stream-id.m3u8",
-		  	"rtmp": "rtmp://xxxxx/hub/stream-id"
-		}
-	}
+	"channel": <channel channel>
 }
 ```
 
 - `channel`： `channel`类型，本次创建的频道信息，定义见[这里](#channel-definition)
-- `is_liked`： `bool`类型，当前用户是否已点赞该频道
-- `playback`： 回放地址，如果尚未结束推流，为`null`
-- `live`： 直播地址，如果不在推流中，为`null`
-
 
 **失败**
 

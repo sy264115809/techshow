@@ -400,7 +400,9 @@ def _assemble_channel(channel, need_url = True):
         'channel': channel.to_json(),
         'is_liked': channel.is_like(current_user),
         'live': None,
-        'playback': None
+        'playback': None,
+        'live_time': None,
+        'online_nums': None
     }
 
     if need_url:
@@ -411,7 +413,11 @@ def _assemble_channel(channel, need_url = True):
                 'hls': stream.hls_live_urls()['ORIGIN'],
                 'flv': stream.http_flv_live_urls()['ORIGIN']
             }
-            ret['live'] = live
+            ret.update({
+                'live': live,
+                'live_time': (datetime.now() - channel.started_at).seconds,
+                'online_nums': 0  # TODO redis 读取在线人数
+            })
 
         # 回放地址
         if channel.is_published:

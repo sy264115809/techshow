@@ -79,7 +79,7 @@ class Channel(db.Model):
         return self.liked_users.filter(channel_user_like.c.user_id == user.id).count() > 0
 
     def to_json(self):
-        ret = {
+        return {
             'id': self.id,
             'title': self.title,
             'thumbnail': self.thumbnail,
@@ -95,12 +95,6 @@ class Channel(db.Model):
             'stopped_at': mktime(self.stopped_at.timetuple()) if self.stopped_at else None,
             'created_at': mktime(self.created_at.timetuple()),
         }
-        if self.is_publishing:
-            ret.update({
-                'live_time': (datetime.now() - self.started_at).seconds,
-                'online_nums': 0  # TODO redis 读取在线人数
-            })
-        return ret
 
 
 class Complaint(db.Model):
