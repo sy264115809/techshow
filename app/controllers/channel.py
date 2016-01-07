@@ -3,8 +3,6 @@
 from datetime import datetime
 from time import mktime
 
-from pili import *
-
 from flask import Blueprint, current_app, request, json
 from flask_login import login_required, current_user
 
@@ -16,6 +14,7 @@ from app.models.setting import Setting, SETTING_MAX_CHANNEL_NUMS, SETTING_SEND_M
 from app.http.request import paginate, Rule, parse_params, parse_int
 from app.http.response import success, MaxChannelTouched, ChannelNotFound, ChannelInaccessible, Unauthorized, \
     BadRequest, RongCloudError, MessageTooFrequently
+from app.http.pili_service import get_stream, create_dynamic_stream
 from app.http.rong_cloud import ApiClient, ClientError
 
 channels_endpoint = Blueprint('channels', __name__, url_prefix = '/channels')
@@ -48,9 +47,9 @@ def create_channel():
     # get or create stream
     user = current_user
     if user.stream_id:
-        stream = _get_stream(user.stream_id)
+        stream = get_stream(user.stream_id)
     else:
-        stream = _create_dynamic_stream()
+        stream = create_dynamic_stream()
         user.stream_id = stream.id
 
     # 删除所有该用户的其他处于'新建'状态的频道
@@ -185,7 +184,7 @@ def publish(channel_id):
         })
     except ClientError, e:
         current_app.logger.error('create rong cloud chatroom with error: [%s]' % e)
-        raise RongCloudError
+        # TODO 加入队列继续尝试创建
 
     channel.started_at = datetime.now()
     channel.owner.stream_status = StreamStatus.unavailable
@@ -212,7 +211,7 @@ def finish(channel_id):
     start = mktime(channel.started_at.timetuple())
     end = mktime(stopped_at.timetuple())
 
-    segments = _get_stream(channel.stream_id).segments(start_second = int(start), end_second = int(end))
+    segments = get_stream(channel.stream_id).segments(start_second = int(start), end_second = int(end))
     if isinstance(segments, list):
         for segment in segments:
             duration += segment['duration']
@@ -224,6 +223,14 @@ def finish(channel_id):
     channel.owner.stream_status = StreamStatus.available
     channel.status = ChannelStatus.published
     db.session.commit()
+
+    # 在融云中销毁相应聊天室
+    try:
+        ApiClient().chatroom_destroy(channel.id)
+    except ClientError, e:
+        current_app.logger.error('destroy rong cloud chatroom with error: [%s]' % e)
+        # TODO 加入队列继续尝试关闭
+
     return success()
 
 
@@ -387,21 +394,8 @@ def get_channel_messages(channel_id):
     })
 
 
-def _hub():
-    credentials = Credentials(current_app.config['PILI_ACCESS_KEY'], current_app.config['PILI_SECRET_KEY'])
-    return Hub(credentials, current_app.config['PILI_HUB_NAME'])
-
-
-def _get_stream(stream_id):
-    return _hub().get_stream(stream_id)
-
-
-def _create_dynamic_stream():
-    return _hub().create_stream()
-
-
 def _assemble_channel(channel, need_url = True):
-    stream = _get_stream(channel.stream_id)
+    stream = get_stream(channel.stream_id)
     ret = {
         'channel': channel.to_json(),
         'is_liked': channel.is_like(current_user),
