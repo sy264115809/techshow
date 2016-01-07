@@ -405,6 +405,12 @@ def _assemble_channel(channel, need_url = True):
         'online_nums': None
     }
 
+    if channel.is_publishing:
+        ret.update({
+            'live_time': (datetime.now() - channel.started_at).seconds,
+            'online_nums': 0  # TODO redis 读取在线人数
+        })
+
     if need_url:
         # 直播地址
         if channel.is_publishing:
@@ -413,11 +419,7 @@ def _assemble_channel(channel, need_url = True):
                 'hls': stream.hls_live_urls()['ORIGIN'],
                 'flv': stream.http_flv_live_urls()['ORIGIN']
             }
-            ret.update({
-                'live': live,
-                'live_time': (datetime.now() - channel.started_at).seconds,
-                'online_nums': 0  # TODO redis 读取在线人数
-            })
+            ret['live'] = live
 
         # 回放地址
         if channel.is_published:
