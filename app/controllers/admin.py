@@ -48,7 +48,7 @@ def admin_logout():
 @admin_endpoint.route('/channels/index', methods = ['GET'])
 @login_required
 def channel_index():
-    paginate_ = Channel.query.filter_by().paginate(*paginate())
+    paginate_ = Channel.query.filter_by().order_by(Channel.started_at.desc()).paginate(*paginate())
     channels = paginate_.items
     return render_template('admin/channel_index.html', paginate = paginate_, channels = channels, kwargs = {})
 
@@ -68,7 +68,6 @@ def block_channel(channel_id):
         channel.status = ChannelStatus.banned
 
         # 为频道的所有者重新创建一条新的流
-        channel.owner.stream_id = create_dynamic_stream().id
         db.session.commit()
     else:
         abort(403)
