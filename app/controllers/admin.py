@@ -1,14 +1,12 @@
 # coding=utf-8
-from datetime import datetime
-
-from flask import Blueprint, request, current_app, abort, render_template, url_for, redirect
+from flask import Blueprint, request, current_app, render_template, url_for, redirect
 from flask_login import current_user, login_required, logout_user
 
 from app import db
-from app.models.channel import Channel, ChannelStatus
-from app.http.request import paginate, Rule, parse_params
+from app.models.channel import Channel
+from app.controllers.channel import destroy_rongcloud_chatroom, get_channel
+from app.http.request import paginate
 from app.http.response import success
-from app.http.pili_service import get_stream, create_dynamic_stream
 
 admin_endpoint = Blueprint('admin', __name__, url_prefix = '/admin')
 
@@ -48,46 +46,32 @@ def admin_logout():
 @admin_endpoint.route('/channels/index', methods = ['GET'])
 @login_required
 def channel_index():
-    paginate_ = Channel.query.filter_by().order_by(Channel.started_at.desc()).paginate(*paginate())
-    channels = paginate_.items
-    return render_template('admin/channel_index.html', paginate = paginate_, channels = channels, kwargs = {})
+    # db.session.commit()
+    p = Channel.query.filter_by().order_by(Channel.started_at.desc()).paginate(*paginate())
+    return render_template('admin/channel_index.html', channels = p)
+
+
+@admin_endpoint.route('/channels', methods = ['GET'])
+def channels():
+    p = Channel.query.filter_by().order_by(Channel.started_at.desc()).paginate(*paginate())
+    return success({
+        'channels': map(lambda c: [c.id, c.status], p.items)
+    })
 
 
 @admin_endpoint.route('/channels/<int:channel_id>/block', methods = ['POST'])
 @login_required
 def block_channel(channel_id):
-    channel = Channel.query.get(channel_id)
-    if channel and (channel.is_publishing or channel.is_published):
-        # 封禁频道对应的流
-        stream = get_stream(channel.stream_id)
-        stream.disable()
-
-        # 设置频道状态为banned
-        if channel.is_publishing:
-            channel.stopped_at = datetime.now()
-        channel.status = ChannelStatus.banned
-
-        # 为频道的所有者重新创建一条新的流
-        db.session.commit()
-    else:
-        abort(403)
-
+    channel = get_channel(channel_id)
+    channel.banned(destroy_rongcloud_chatroom.s(channel.id))
     return success()
 
 
-@admin_endpoint.route('/channels/<int:channel_id>/release', methods=['POST'])
+@admin_endpoint.route('/channels/<int:channel_id>/release', methods = ['POST'])
 @login_required
 def release_channel(channel_id):
-    channel = Channel.query.get(channel_id)
-    if channel and channel.is_banned:
-        stream = get_stream(channel.stream_id)
-        stream.enable()
-
-        channel.status = ChannelStatus.published
-        db.session.commit()
-    else:
-        abort(403)
-
+    channel = get_channel(channel_id)
+    channel.release()
     return success()
 
 

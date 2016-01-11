@@ -6,7 +6,7 @@
     <script src="{{ url_for('static',filename=filename) }}"></script>
 {% endmacro %}
 
-{% macro render_pagination(pagination, endpoint, kwargs) %}
+{% macro render_pagination(pagination, endpoint) %}
     <div>显示第{{ (pagination.page - 1) * pagination.per_page + 1 }}
         - {{ pagination.page * pagination.per_page }}, 共 {{ pagination.total }} 项.
     </div>
@@ -14,8 +14,8 @@
         <ul class="pagination">
 
             {% if pagination.has_prev %}
-                <li class="paginate_button disabled">
-                    <a href="{{ url_for(endpoint, p=pagination.prev_num, l=pagination.per_page, **kwargs) }}"> 前一页 </a>
+                <li class="paginate_button">
+                    <a href="{{ url_for(endpoint, p=pagination.prev_num, l=pagination.per_page) }}"> 前一页 </a>
                 </li>
             {% else %}
                 <li class="paginate_button disabled">
@@ -27,7 +27,7 @@
                 {% if page %}
                     {% if page != pagination.page %}
                         <li class="paginate_button">
-                            <a href="{{ url_for(endpoint, p=page, l=pagination.per_page, **kwargs) }}">{{ page }}</a>
+                            <a href="{{ url_for(endpoint, p=page, l=pagination.per_page) }}">{{ page }}</a>
                         </li>
                     {% else %}
                         <li class="paginate_button disabled">

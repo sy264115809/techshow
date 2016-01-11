@@ -86,6 +86,7 @@
                             <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>状态</th>
                                 <th>频道标题</th>
                                 <th>直播人</th>
                                 <th>开始时间</th>
@@ -95,10 +96,11 @@
                             </thead>
 
                             <tbody>
-                            {% for channel in channels %}
+                            {% for channel in channels.items %}
                                 <tr data-expanded="true">
                                     <td>{{ channel.id }}</td>
-                                    <td data-status="{{ channel.status }}">{{ channel.title }}</td>
+                                    <td data-status="{{ channel.status }}"></td>
+                                    <td>{{ channel.title }}</td>
                                     <td>{{ channel.owner.nickname }}</td>
                                     <td>{{ channel.started_at }}</td>
                                     <td>{{ channel.stopped_at if channel.stopped_at else '未结束' }}</td>
@@ -126,7 +128,7 @@
                             {% endfor %}
                             </tbody>
                         </table>
-                        {{ render_pagination(paginate, 'admin.channel_index', kwargs) }}
+                        {{ render_pagination(channels, 'admin.channel_index') }}
                     </div>
                 </div>
             </div>

@@ -1,7 +1,6 @@
+/.env
 /.python-version
 .idea
-/config/development.py
-/config/production.py
 *.pyc
 /run
 /logs

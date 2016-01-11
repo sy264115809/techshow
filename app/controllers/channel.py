@@ -1,20 +1,18 @@
 # coding=utf-8
-from random import randint, sample
+import logging
+from random import randint, sample, choice
+from string import ascii_letters, digits
 from datetime import datetime
-from time import mktime
 
-from flask import Blueprint, current_app, request, json
+from flask import Blueprint, current_app, request, json, url_for
 from flask_login import login_required, current_user
 
-from app import db
+from .. import db, celery
 from app.models.channel import Channel, ChannelStatus, Complaint
-from app.models.user import StreamStatus
 from app.models.message import Message
-from app.models.setting import Setting, SETTING_MAX_CHANNEL_NUMS, SETTING_SEND_MESSAGE_FREQUENCY
 from app.http.request import paginate, Rule, parse_params, parse_int
 from app.http.response import success, MaxChannelTouched, ChannelNotFound, ChannelInaccessible, Unauthorized, \
     BadRequest, MessageTooFrequently
-from app.http.pili_service import get_stream, create_dynamic_stream
 from app.http.rong_cloud import ApiClient, ClientError
 
 channels_endpoint = Blueprint('channels', __name__, url_prefix = '/channels')
@@ -37,32 +35,20 @@ def create_channel():
     )
 
     # 检查是否达到最大同时房间数
-    max_nums = Setting.get_setting(
-            SETTING_MAX_CHANNEL_NUMS,
-            current_app.config.get(SETTING_MAX_CHANNEL_NUMS)
-    )
-    if Channel.query.filter_by(stopped_at = None).count() >= max_nums:
+    if Channel.query.filter_by(stopped_at = None).count() >= current_app.config['TECHSHOW_MAX_CHANNELS']:
         raise MaxChannelTouched()
 
-    # get or create stream
-    user = current_user
-    if user.stream_id:
-        stream = get_stream(user.stream_id)
-    else:
-        stream = create_dynamic_stream()
-        user.stream_id = stream.id
-
     # 删除所有该用户的其他处于'新建'状态的频道
-    Channel.query.filter_by(owner = user, status = ChannelStatus.initiate).delete()
+    Channel.query.filter_by(owner = current_user, status = ChannelStatus.initiate).delete()
 
     # 新建频道
-    channel = Channel(owner = user, **q)
+    channel = Channel(**q)
     db.session.add(channel)
     db.session.commit()
 
     return success({
         'channel': channel.to_json(),
-        'stream': json.loads(stream.to_json())
+        'stream': json.loads(channel.stream.to_json())
     })
 
 
@@ -78,7 +64,7 @@ def get_live_channels():
     q = parse_params(request.args, Rule('owner_id'))
     q['status'] = ChannelStatus.publishing
     channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
-    ret = _assemble_channels(channels)
+    ret = Channel.assemble_channels(channels)
     return success({
         'count': len(ret),
         'channels': ret
@@ -97,7 +83,7 @@ def get_playback_channels():
     q = parse_params(request.args, Rule('owner_id'))
     q['status'] = ChannelStatus.published
     channels = Channel.query.filter_by(**q).order_by(Channel.stopped_at.desc()).paginate(*paginate()).items
-    ret = _assemble_channels(channels)
+    ret = Channel.assemble_channels(channels)
     return success({
         'count': len(ret),
         'channels': ret
@@ -133,7 +119,7 @@ def get_my_channels():
     )
     q['owner'] = current_user
     channels = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(*paginate()).items
-    ret = _assemble_channels(channels)
+    ret = Channel.assemble_channels(channels)
     return success({
         'count': len(ret),
         'channels': ret
@@ -147,11 +133,11 @@ def get_channel_info(channel_id):
     :param channel_id: 访问的频道id
     :type channel_id: int
     """
-    channel = _get_channel(channel_id, access_control = True)
+    channel = get_channel(channel_id, access_control = True)
     channel.visit_count += 1
     db.session.commit()
     return success({
-        'channel': _assemble_channel(channel)
+        'channel': channel.to_json()
     })
 
 
@@ -162,36 +148,89 @@ def publish(channel_id):
     :param channel_id: 开始推流的频道id
     :type channel_id: int
     """
-
-    channel = _get_channel(channel_id, must_owner = True)
+    channel = get_channel(channel_id, must_owner = True)
     if not channel.is_new:
         raise BadRequest('channel is not at initiate status')
 
-    # 将其他正在使用该stream进行直播的房间设置为推流完毕
-    Channel.query.filter_by(
-            stream_id = channel.stream_id,
-            status = ChannelStatus.publishing
-    ).update({
-        'stopped_at': datetime.now(),
-        'status': ChannelStatus.published
-    })
+    resp = {}
 
-    # 在融云中创建一个聊天室
+    # 如果有当前流上有正在直播的房间, 将其结束
+    occupancy = Channel.query.filter_by(stream_id = channel.stream_id, status = ChannelStatus.publishing).first()
+    if occupancy:
+        task = occupancy.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
+        resp['terminate_occupancy_task'] = _task_url(task)
+
+    # 开始推流, 并在融云中创建一个聊天室
+    task = channel.publish(create_rongcloud_chatroom.s(channel.id, channel.title))
+    resp['create_task'] = _task_url(task)
+    # if not current_app.config['DEBUG'] or True:
+    if True:
+        # 延迟10s启动频道存活状态监控
+        resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
+
+    return success(resp)
+
+
+@celery.task(bind = True)
+def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
+    """向融云服务器发起创建聊天室的请求
+    应通过create_rongcloud_chatroom.delay调用
+    :param self: celery task
+    :param chatroom_id: 创建的聊天室id
+    :param chatroom_name: 创建的聊天室名字
+    """
     try:
-        # {'room_id':'room_name'}
         ApiClient().chatroom_create({
-            channel.id: channel.title
+            chatroom_id: chatroom_name
         })
-    except ClientError, e:
-        current_app.logger.error('create rong cloud chatroom with error: [%s]' % e)
-        # TODO 加入队列继续尝试创建
+        return {
+            'action': 'create',
+            'chatroom_id': chatroom_id,
+            'chatroom_name': chatroom_name
+        }
+    except ClientError as exc:
+        logging.warning('Create chatroom[%d] error: [%s].', chatroom_id, exc)
+        # 每隔20s重试一次, 直至成功
+        raise self.retry(exc = exc, countdown = 20, max_retries = None)
 
-    channel.started_at = datetime.now()
-    channel.owner.stream_status = StreamStatus.unavailable
-    channel.status = ChannelStatus.publishing
-    db.session.commit()
 
-    return success()
+@celery.task(bind = True)
+def monitor_channel(self, channel_id):
+    """监视频道所对应的流是否还处于连接或可用状态,
+    防止客户端没有调用finish接口导致已经停止推流的频道还处于直播状态.
+    应通过monitor_channel.delay嗲用
+    :param self: celery task
+    :param channel_id: 监控的频道id
+    """
+    channel = Channel.query.get(channel_id)
+    if channel and channel.is_publishing:
+        if channel.check_stream_alive():
+            raise self.retry(countdown = 10, maxretries = None)
+        else:
+            channel.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
+    return {
+        'action': 'monitor done',
+        'channel_id': channel_id,
+    }
+
+
+@celery.task(bind = True)
+def destroy_rongcloud_chatroom(self, chatroom_id):
+    """向融云服务器发起销毁聊天室的请求
+    应通过destroy_rongcloud_chatroom.delay调用
+    :param self: celery task
+    :param chatroom_id: 销毁的聊天室id
+    """
+    try:
+        ApiClient().chatroom_destroy(chatroom_id)
+        return {
+            'action': 'destroy',
+            'chatroom_id': chatroom_id
+        }
+    except ClientError as exc:
+        logging.warning('Destroy chatroom[%d] error: [%s]', chatroom_id, exc)
+        # 每隔30s重试一次, 至多重试5次
+        raise self.retry(exc = exc, countdown = 30, max_retries = 5)
 
 
 @channels_endpoint.route('/finish/<int:channel_id>', methods = ['POST'])
@@ -201,37 +240,13 @@ def finish(channel_id):
     :param channel_id: 结束推流的频道id
     :type channel_id: int
     """
-    stopped_at = datetime.now()
-
-    channel = _get_channel(channel_id, must_owner = True)
-    if not channel.is_publishing:
-        raise BadRequest('channel is not publishing')
-
-    duration = 0
-    start = mktime(channel.started_at.timetuple())
-    end = mktime(stopped_at.timetuple())
-
-    segments = get_stream(channel.stream_id).segments(start_second = int(start), end_second = int(end))
-    if isinstance(segments, list):
-        for segment in segments:
-            duration += segment['duration']
-    else:
-        duration = segments['duration']
-
-    channel.stopped_at = stopped_at
-    channel.duration = duration
-    channel.owner.stream_status = StreamStatus.available
-    channel.status = ChannelStatus.published
-    db.session.commit()
-
-    # 在融云中销毁相应聊天室
-    try:
-        ApiClient().chatroom_destroy(channel.id)
-    except ClientError, e:
-        current_app.logger.error('destroy rong cloud chatroom with error: [%s]' % e)
-        # TODO 加入队列继续尝试关闭
-
-    return success()
+    channel = get_channel(channel_id, must_owner = True)
+    task = channel.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
+    if not task:
+        raise BadRequest('channel is not at publishing status')
+    return success({
+        'finish_task': _task_url(task)
+    })
 
 
 @channels_endpoint.route('/stream/<int:channel_id>', methods = ['GET'])
@@ -241,11 +256,10 @@ def stream_status(channel_id):
     :param channel_id: 查询流状态的频道id
     :type channel_id: int
     """
-    channel = _get_channel(channel_id)
-    stream = get_stream(channel.stream_id)
+    channel = get_channel(channel_id)
     return success({
-        'disabled': stream.disabled,
-        'status': stream.status()['status']
+        'disabled': channel.stream.disabled,
+        'status': channel.stream.status()['status']
     })
 
 
@@ -256,7 +270,7 @@ def like(channel_id):
     :param channel_id: 点赞的频道id
     :type channel_id: int
     """
-    channel = _get_channel(channel_id, access_control = True)
+    channel = get_channel(channel_id, access_control = True)
     # TODO:redis缓存
     ok = channel.like(current_user)
     if not ok:
@@ -274,7 +288,7 @@ def dislike(channel_id):
     :param channel_id: 取消点赞的频道id
     :type channel_id: int
     """
-    channel = _get_channel(channel_id, access_control = True)
+    channel = get_channel(channel_id, access_control = True)
     # TODO:redis缓存
     ok = channel.dislike(current_user)
     if not ok:
@@ -297,7 +311,7 @@ def send_complain(channel_id):
     """
     q = parse_params(request.json, Rule('reason', must = True))
 
-    channel = _get_channel(channel_id, True)
+    channel = get_channel(channel_id, True)
 
     complain = Complaint(reporter = current_user, channel = channel, **q)
     db.session.add(complain)
@@ -321,14 +335,14 @@ def send_message(channel_id):
     content = parse_params(request.json, Rule('content', must = True))['content']
 
     # 检查用户发言间隔是否超过阈值
-    frequency = Setting.get_setting(
-            SETTING_SEND_MESSAGE_FREQUENCY,
-            current_app.config.get(SETTING_SEND_MESSAGE_FREQUENCY)
-    )
-    if (created_at - current_user.last_send_message_at).seconds < frequency:
-        raise MessageTooFrequently()
+    # frequency = Setting.get_setting(
+    #         SETTING_SEND_MESSAGE_FREQUENCY,
+    #         current_app.config.get(SETTING_SEND_MESSAGE_FREQUENCY)
+    # )
+    # if (created_at - current_user.last_send_message_at).seconds < frequency:
+    #     raise MessageTooFrequently()
 
-    channel = _get_channel(channel_id, access_control = True)
+    channel = get_channel(channel_id, access_control = True)
     # if get channel, the status of channel is neither publishing nor published
     if channel.is_published:
         offset = parse_params(request.json, Rule('offset', must = True))['offset']
@@ -351,25 +365,49 @@ def send_message(channel_id):
     db.session.commit()
 
     if channel.is_publishing:
-        # 如果正在推流,调用融云发送聊天室消息
-        try:
-            msg = json.dumps({
-                'content': content,
-                'extra': {
-                    'name': current_user.nickname,
-                    'avatar': current_user.avatar
-                }
-            })
-            ApiClient().message_chatroom_publish(
-                    from_user_id = current_user.id,
-                    to_chatroom_id = channel.id,
-                    object_name = 'RC:TxtMsg',
-                    content = msg
-            )
-        except ClientError, e:
-            current_app.logger.info('user %d send message "%s" with error: %s', current_user.id, content, e)
+        # @task 如果正在推流,调用融云发送聊天室消息
+        send_task = send_rongcloud_message.delay(current_user.id, current_user.name, current_user.avatar, channel_id,
+                                                 content)
+        return success({
+            'send_task': _task_url(send_task)
+        })
 
     return success()
+
+
+@celery.task(bind = True)
+def send_rongcloud_message(self, user_id, name, avatar, chatroom_id, message, retry = None):
+    """向融云服务器发送聊天室消息.
+    应通过send_rongcloud_message.delay调用
+    :param self: celery task
+    :param user_id: 发送消息的用户id
+    :param name: 发送消息的用户名称
+    :param avatar: 发送消息的用户头像
+    :param chatroom_id: 发往的聊天室id
+    :param message: 发送的消息
+    :param retry: 失败后重试的次数,默认不重试
+    """
+    try:
+        ApiClient().message_chatroom_publish(
+                from_user_id = user_id,
+                to_chatroom_id = chatroom_id,
+                object_name = 'RC:TxtMsg',
+                content = json.dumps({
+                    'content': message,
+                    'extra': {'name': name, 'avatar': avatar}
+                })
+        )
+        return {
+            'action': 'send message',
+            'user_id': user_id,
+            'chatroom_id': chatroom_id,
+            'message': message
+        }
+    except ClientError as exc:
+        logging.warning('User[%d] send message[%s] to chatroom[%d] error: [%s].', user_id, message, chatroom_id, exc)
+        if retry:
+            # 每隔5s重试一次, 至多重试3次
+            raise self.retry(exc = exc, countdown = 5, max_retries = retry)
 
 
 @channels_endpoint.route('/messages/<int:channel_id>', methods = ['GET'])
@@ -384,7 +422,7 @@ def get_channel_messages(channel_id):
     :param channel_id:查询的频道id
     :type channel_id:int
     """
-    channel = _get_channel(channel_id, access_control = True)
+    channel = get_channel(channel_id, access_control = True)
 
     start = parse_int('s', default = 0, condition = lambda s: s >= 0)  # 相对起始时间
     offset = parse_int('o', default = 10, condition = lambda o: o > 0)  # 相对起始时间的便宜
@@ -409,113 +447,45 @@ def get_channel_messages(channel_id):
     })
 
 
+@channels_endpoint.route('/task/<task_id>')
+def task_status(task_id):
+    task = celery.AsyncResult(task_id)
+    return success({
+        'task_state': task.state,
+        'info': str(task.info)
+    })
+
+
 @channels_endpoint.route('/mock/sendmsg', methods = ['GET'])
 def send_mock_msg():
-    channel_id = int(request.args.get('id'))
-    cnt = int(request.args.get('cnt'))
-    infos = [
-        {'nickname': 'sy264115809',
-         'avatar': 'https://avatars.githubusercontent.com/u/6114462?v=3'},
-        {'nickname': 'MistyL',
-         'avatar': 'https://avatars.githubusercontent.com/u/16283083?v=3'},
-        {'nickname': 'Kivenhaoyu',
-         'avatar': 'https://avatars.githubusercontent.com/u/8874808?v=3'},
-        {'nickname': '俞杰',
-         'avatar': 'https://avatars2.githubusercontent.com/u/6002026?v=3&s=400'},
-        {'nickname': '付业成',
-         'avatar': 'https://avatars0.githubusercontent.com/u/91730?v=3&s=400'},
-        {'nickname': '杜晓东',
-         'avatar': 'https://avatars0.githubusercontent.com/u/6927481?v=3&s=400'},
-        {'nickname': '杜晓峰',
-         'avatar': 'https://avatars0.githubusercontent.com/u/1694541?v=3&s=400'},
-        {'nickname': '郑李新',
-         'avatar': 'https://avatars2.githubusercontent.com/u/1264747?v=3&s=400'},
-        {'nickname': '袁晓沛',
-         'avatar': 'https://avatars2.githubusercontent.com/u/739343?v=3&s=400'}
+    mock_users = [
+        {'id': 1, 'name': '邵羽', 'avatar': 'https://avatars.githubusercontent.com/u/6114462?v=3'},
+        {'id': 2, 'name': 'MistyL', 'avatar': 'https://avatars.githubusercontent.com/u/16283083?v=3'},
+        {'id': 3, 'name': 'Kivenhaoyu', 'avatar': 'https://avatars.githubusercontent.com/u/8874808?v=3'},
+        {'id': 4, 'name': '俞杰', 'avatar': 'https://avatars2.githubusercontent.com/u/6002026?v=3&s=400'},
+        {'id': 5, 'name': '付业成', 'avatar': 'https://avatars0.githubusercontent.com/u/91730?v=3&s=400'},
+        {'id': 6, 'name': '杜晓东', 'avatar': 'https://avatars0.githubusercontent.com/u/6927481?v=3&s=400'},
+        {'id': 7, 'name': '杜晓峰', 'avatar': 'https://avatars0.githubusercontent.com/u/1694541?v=3&s=400'},
+        {'id': 8, 'name': '郑李新', 'avatar': 'https://avatars2.githubusercontent.com/u/1264747?v=3&s=400'},
+        {'id': 9, 'name': '袁晓沛', 'avatar': 'https://avatars2.githubusercontent.com/u/739343?v=3&s=400'}
     ]
-
-    if channel_id is None or cnt is None:
-        raise BadRequest('missing argument id or cnt')
-    else:
-        ok = 0
-        for i in range(0, cnt):
-            user_id = randint(1, 9)
-            amount = randint(1, 25)
-            content = ''.join(sample('AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789', amount))
-            try:
-                msg = json.dumps({
-                    'content': content,
-                    'extra': {
-                        'name': infos[user_id - 1]['nickname'],
-                        'avatar': infos[user_id - 1]['avatar']
-                    }
-                })
-                ApiClient().message_chatroom_publish(
-                        from_user_id = user_id,
-                        to_chatroom_id = channel_id,
-                        object_name = 'RC:TxtMsg',
-                        content = msg
-                )
-                ok += 1
-            except ClientError, e:
-                # current_app.logger.info('user %d send message "%s" with error: %s', current_user.id, content, e)
-                pass
-        return success({
-            'send': ok
-        })
+    channel_id = parse_params(request.args, Rule('id', must = True))
+    cnt = parse_int('cnt', 100, lambda c: c <= 100)
+    for i in range(0, cnt):
+        user = choice(mock_users)
+        message = ''.join(sample(ascii_letters + digits, randint(1, 25)))
+        send_rongcloud_message.delay(user['id'], user['name'], user['avatar'], channel_id, message)
+    return success()
 
 
-def _assemble_channel(channel, need_url = True):
-    stream = get_stream(channel.stream_id)
-    ret = {
-        'channel': channel.to_json(),
-        'is_liked': channel.is_like(current_user),
-        'live': None,
-        'playback': None,
-        'live_time': None,
-        'online_nums': None
-    }
-
-    if channel.is_publishing:
-        ret.update({
-            'live_time': (datetime.now() - channel.started_at).seconds,
-            'online_nums': 0  # TODO redis 读取在线人数
-        })
-
-    if need_url:
-        # 直播地址
-        if channel.is_publishing:
-            live = {
-                'rtmp': stream.rtmp_live_urls()['ORIGIN'],
-                'hls': stream.hls_live_urls()['ORIGIN'],
-                'flv': stream.http_flv_live_urls()['ORIGIN']
-            }
-            ret['live'] = live
-
-        # 回放地址
-        if channel.is_published:
-            start = mktime(channel.started_at.timetuple())
-            end = mktime(channel.stopped_at.timetuple())
-            playback = {
-                'hls': stream.hls_playback_urls(start_second = start, end_second = end)['ORIGIN']
-            }
-            ret['playback'] = playback
-
-    return ret
+@channels_endpoint.route('/chatroom/<int:channel_id>', methods = ['GET'])
+def chatroom_info(channel_id):
+    return success({
+        'info': ApiClient().chatroom_query(channel_id)
+    })
 
 
-def _assemble_channels(channels):
-    if len(channels) == 0:
-        raise ChannelNotFound()
-
-    ret = list()
-    for channel in channels:
-        ret.append(_assemble_channel(channel, need_url = False))
-
-    return ret
-
-
-def _get_channel(channel_id, access_control = False, must_owner = False):
+def get_channel(channel_id, access_control = False, must_owner = False):
     channel = Channel.query.get(channel_id)
 
     if channel is None:
@@ -526,3 +496,7 @@ def _get_channel(channel_id, access_control = False, must_owner = False):
         raise Unauthorized()
 
     return channel
+
+
+def _task_url(task):
+    return url_for('channels.task_status', task_id = task.id, _external = True)

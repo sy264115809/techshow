@@ -1,19 +1,15 @@
 # coding=utf-8
-import base64
 import random
-import json
-
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, url_for, redirect, render_template
+from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort
 from flask_login import login_required, current_user, login_user
-from rauth import OAuth2Service
 
 from app import db, login_manager
 from app.models.user import User, UserGender
 from app.http.request import paginate, Rule, parse_params
-from app.http.response import success, InvalidAuthCode, UserNotFound, OAuthFail, RongCloudError
-from app.http.rong_cloud import ApiClient, ClientError
+from app.http.response import success, InvalidAuthCode, UserNotFound, OAuthFail
+from app.http.oauth import OAuthSignIn
 
 users_endpoint = Blueprint('users', __name__, url_prefix = '/users')
 
@@ -62,10 +58,8 @@ def login_by_mobile():
     if delta > AUTH_CODE_VALIDITY_SECONDS:
         raise InvalidAuthCode()
 
-    user.auth_code = ''
-    user.get_auth_code_count = 0
-    user.rong_cloud_token = _get_rong_cloud_token(user)
     user.login()
+    db.session.commit()
 
     return success({
         'user': user.to_json(),
@@ -74,28 +68,24 @@ def login_by_mobile():
     })
 
 
-@users_endpoint.route('/login/github', methods = ['GET'])
-def login_by_github():
+@users_endpoint.route('/login/<provider_name>', methods = ['GET'])
+def login_by_oauth(provider_name):
     """GitHub OAuth
+    :param provider_name: 支持: github qiniu
     """
-    redirect_uri = url_for(
-            endpoint = 'users.login_by_github_callback',
-            next = request.args.get('next') or request.referrer or None,
-            _external = True
-    )
-    return redirect(_github_oauth().get_authorize_url(redirect_uri = redirect_uri))
+    provider = OAuthSignIn.get_provider(provider_name)
+    if provider:
+        return provider.authorize()
+    else:
+        return abort(404)
 
 
 @users_endpoint.route('/login/github/callback', methods = ['GET'])
 def login_by_github_callback():
     """Github OAuth 回调
     """
-    code = parse_params(request.args, Rule('code', must = True))['code']
-    try:
-        data = dict(code = code)
-        auth = _github_oauth().get_auth_session(data = data)
-        info = auth.get('user').json()
-    except Exception:
+    code, info = OAuthSignIn.get_provider('github').callback()
+    if code is None:
         raise OAuthFail()
 
     user = User.query.filter_by(github_id = info.get('id')).first()
@@ -126,28 +116,12 @@ def login_by_github_callback():
     return render_template('login.html')
 
 
-@users_endpoint.route('/login/qiniu', methods = ['GET'])
-def login_by_qiniu():
-    """Qiniu OAuth
-    """
-    redirect_uri = url_for(
-            endpoint = 'users.login_by_qiniu_callback',
-            next = request.args.get('next') or request.referrer or None,
-            _external = True
-    )
-    return redirect(_qiniu_oauth().get_authorize_url(redirect_uri = redirect_uri, response_type = 'code'))
-
-
 @users_endpoint.route('/login/qiniu/callback', methods = ['GET'])
 def login_by_qiniu_callback():
     """Qiniu OAuth 回调
     """
-    code = parse_params(request.args, Rule('code', must = True))['code']
-    try:
-        data = dict(code = code, grant_type = 'authorization_code')
-        auth = _qiniu_oauth().get_auth_session(data = data, decoder = lambda c: json.loads(c))
-        info = auth.get('info?access_token=' + auth.access_token).json().get('data')
-    except Exception:
+    code, info = OAuthSignIn.get_provider('qiniu').callback()
+    if code is None:
         raise OAuthFail()
 
     user = User.query.filter_by(qiniu_id = info.get('uid')).first()
@@ -187,9 +161,9 @@ def get_user_access_token():
     if user is None:
         raise InvalidAuthCode()
 
-    user.oauth_code = ''
-    user.rong_cloud_token = _get_rong_cloud_token(user)
     user.login()
+    db.session.commit()
+
     return success({
         'user': user.to_json(),
         'api_token': user.api_token,
@@ -203,24 +177,8 @@ def logout():
     """登出
     """
     current_user.api_token = ''
-    db.session.add(current_user)
     db.session.commit()
     return success()
-
-
-@users_endpoint.route('/token/rongcloud')
-@login_required
-def get_rong_cloud_token():
-    token = _get_rong_cloud_token()
-    if token is None:
-        raise RongCloudError()
-
-    current_user.rong_cloud_token = token
-    db.session.commit()
-
-    return success({
-        'rong_cloud_token': token
-    })
 
 
 @users_endpoint.route('', methods = ['GET'])
@@ -318,15 +276,3 @@ def _github_oauth():
 
 def _qiniu_oauth():
     return OAuth2Service(**current_app.config['OAUTH_QINIU'])
-
-
-def _get_rong_cloud_token(user):
-    try:
-        return ApiClient().user_get_token(
-                user_id = user.id,
-                name = user.nickname or user.name,
-                portrait_uri = user.avatar or 'https://avatars.githubusercontent.com/u/16420492'
-        ).get('token')
-    except ClientError, e:
-        current_app.logger.error('get rong cloud token with error: %s' % e)
-        return None
