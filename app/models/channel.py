@@ -188,7 +188,8 @@ class Channel(db.Model):
             if segments:
                 self.started_at = strftime('%Y-%m-%d %H:%M:%S', segments[-1]['start'])
                 self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', segments[0]['end'])
-                # TODO: else, set start & stop time to None.  Or delete this channel.
+            else:
+                self.delete()
 
     def check_stream_alive(self):
         """检查流是否存活
