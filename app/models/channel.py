@@ -1,6 +1,6 @@
 # coding=utf-8
 from datetime import datetime
-from time import mktime, strftime
+from time import mktime, strftime, localtime
 from flask_login import current_user, current_app
 
 from app import db, cache
@@ -186,8 +186,8 @@ class Channel(db.Model):
 
             segments = segment_info['segments']
             if segments:
-                self.started_at = strftime('%Y-%m-%d %H:%M:%S', segments[-1]['start'])
-                self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', segments[0]['end'])
+                self.started_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[-1]['start']))
+                self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[0]['end']))
             else:
                 db.session.delete(self)
 
