@@ -145,7 +145,7 @@ def login_by_qiniu_callback():
     # if user is admin, login it and redirect to admin index
     if user.qiniu_email in current_app.config['ADMIN_QINIU']:
         login_user(user)
-        return render_template(url_for('admin.admin_index'))
+        return redirect(url_for('admin.admin_index'))
 
     return render_template('login.html')
 
