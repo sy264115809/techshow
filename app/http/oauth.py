@@ -91,5 +91,5 @@ class QiniuSignIn(OAuthSignIn):
                 },
                 decoder = lambda c: json.loads(c)
         )
-        me = oauth_session.get('info?access_token=' + oauth_session.access_token).json().get['data']
+        me = oauth_session.get('info?access_token=' + oauth_session.access_token).json().get('data')
         return code, me
