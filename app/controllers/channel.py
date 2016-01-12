@@ -194,7 +194,7 @@ def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
         raise self.retry(exc = exc, countdown = 20, max_retries = None)
 
 
-@celery.task(bind = True)
+@celery.task(bind = True, max_retries = None)
 def monitor_channel(self, channel_id):
     """监视频道所对应的流是否还处于连接或可用状态,
     防止客户端没有调用finish接口导致已经停止推流的频道还处于直播状态.
@@ -205,7 +205,7 @@ def monitor_channel(self, channel_id):
     channel = Channel.query.get(channel_id)
     if channel and channel.is_publishing:
         if channel.check_stream_alive():
-            raise self.retry(countdown = 10, maxretries = None)
+            raise self.retry(countdown = 10)
         else:
             channel.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
     return {
