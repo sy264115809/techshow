@@ -76,7 +76,7 @@ class QiniuSignIn(OAuthSignIn):
         )
 
     def authorize(self):
-        return redirect(self.service.get_authorize_url(redirect_uri = self.get_callback_url()))
+        return redirect(self.service.get_authorize_url(redirect_uri = self.get_callback_url(), response_type = 'code'))
 
     def callback(self):
         if 'code' not in request.args:
