@@ -8,14 +8,13 @@ if os.path.exists('.env'):
         if len(var) == 2:
             os.environ[var[0]] = var[1]
 
-from app import create_app, db, celery
+from app import create_app, db
 from app.models.user import User
 from app.models.channel import Channel
 from flask_script import Manager, Shell
 from flask_migrate import Migrate, MigrateCommand
 
 app = create_app(os.getenv('TECHSHOW_CONFIG') or 'default')
-app.app_context().push()
 
 migrate = Migrate(app, db)
 manager = Manager(app)
