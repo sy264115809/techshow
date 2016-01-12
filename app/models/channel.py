@@ -189,7 +189,7 @@ class Channel(db.Model):
                 self.started_at = strftime('%Y-%m-%d %H:%M:%S', segments[-1]['start'])
                 self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', segments[0]['end'])
             else:
-                self.delete()
+                db.session.delete(self)
 
     def check_stream_alive(self):
         """检查流是否存活
