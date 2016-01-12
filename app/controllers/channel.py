@@ -469,7 +469,7 @@ def send_mock_msg():
         {'id': 8, 'name': '郑李新', 'avatar': 'https://avatars2.githubusercontent.com/u/1264747?v=3&s=400'},
         {'id': 9, 'name': '袁晓沛', 'avatar': 'https://avatars2.githubusercontent.com/u/739343?v=3&s=400'}
     ]
-    channel_id = parse_params(request.args, Rule('id', must = True))
+    channel_id = parse_params(request.args, Rule('id', must = True))['id']
     cnt = parse_int('cnt', 100, lambda c: c <= 100)
     for i in range(0, cnt):
         user = choice(mock_users)
