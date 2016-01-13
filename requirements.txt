@@ -12,6 +12,7 @@ pili==1.5.4
 requests>=2.1.0
 gunicorn==19.4.1
 celery[redis]==3.1.19
+qiniu==7.0.6
 
 # Flask-SocketIO==1.2
 # gevent==1.1b5
