@@ -8,7 +8,7 @@ if os.path.exists('.env'):
         if len(var) == 2:
             os.environ[var[0]] = var[1]
 
-from app import create_app, db
+from app import create_app, db, celery
 from app.models.user import User
 from app.models.channel import Channel
 from flask_script import Manager, Shell
