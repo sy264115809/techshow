@@ -1064,8 +1064,23 @@ Authorization: Basic Auth
 {
 	"code": 2000,
 	"desc": "ok",
+	"count": <int count>,
+	"messages": [
+	    <message m1>,
+	    <message m2>,
+	    ...
+	],
+	"start": <int start>,
+	"offset": <int offset>,
+	"limit": <int limit>
 }
 ```
+
+- `count`： `int`类型，查询返回的消息数量
+- `messages`： 查询返回的所有消息列表，其中每一个元素都为[消息类型](#message-definition)
+- `start`： `int`类型，对应请求的`s`参数，即本次请求的上下文，方便调试
+- `offset`： `int`类型，对应请求的`o`参数，即本次请求的上下文，方便调试
+- `limit`： `int`类型，对应请求的`l`参数，即本次请求的上下文，方便调试
 
 **失败**
 
@@ -1074,5 +1089,4 @@ API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
 API_CHANNEL_INACCESSIBLE
-API_MESSAGE_TOO_FREQUENTLY
 ```
