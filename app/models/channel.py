@@ -137,24 +137,26 @@ class Channel(db.Model):
             self.stopped_at = datetime.now()
             self.owner.stream_status = StreamStatus.available
             self.calc_duration()
+            if self.duration == 0:
+                db.session.delete(self)
             db.session.commit()
             if hasattr(callback_task, 'apply_async'):
                 return callback_task.apply_async()
             return True
         return False
 
-    def banned(self, callback_task = None):
+    def disable(self, callback_task = None):
         """封禁房间.
         :param callback_task: 回调的celery subtask
         """
         # 掐断直播
-        self.stream.disable().enable()
+        self.owner.disable_stream()
         self.finish(callback_task)
         self.status = ChannelStatus.banned
         db.session.commit()
         return True
 
-    def release(self):
+    def enable(self):
         """解封房间
         """
         if self.is_banned:
@@ -188,8 +190,6 @@ class Channel(db.Model):
             if segments:
                 self.started_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[-1]['start']))
                 self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[0]['end']))
-            else:
-                db.session.delete(self)
 
     def check_stream_alive(self):
         """检查流是否存活
