@@ -253,6 +253,23 @@ class Complaint(db.Model):
     channel = db.relationship('Channel', backref = db.backref('complaints', lazy = 'dynamic'))
     reason_type = db.Column(db.Integer)
     reason = db.Column(db.Text)
+    is_read = db.Column(db.Boolean, default = False)
 
     def __init__(self, **kwargs):
         super(Complaint, self).__init__(**kwargs)
+
+
+class Thumbnail(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    key = db.Column(db.String(128), index = True)
+    domain = db.Column(db.String(128))
+    name = db.Column(db.String(128))
+    created_at = db.Column(db.DateTime, default = datetime.now)
+
+    def __init__(self, **kwargs):
+        self.domain = current_app.config['QINIU_DOMAIN']
+        super(Thumbnail, self).__init__(**kwargs)
+
+    @property
+    def url(self):
+        return 'http://%s/%s' % (self.domain, self.key)

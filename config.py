@@ -39,9 +39,9 @@ class Config(object):
     }
 
     QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN')
-    QINIU_BUCKET = os.environ.get('BUCKET')
-    QINIU_ACCESS_KEY = os.environ.get('ACCESS_KEY')
-    QINIU_SECRET_KEY = os.environ.get('SECRET_KEY')
+    QINIU_BUCKET = os.environ.get('QINIU_BUCKET')
+    QINIU_ACCESS_KEY = os.environ.get('QINIU_ACCESS_KEY')
+    QINIU_SECRET_KEY = os.environ.get('QINIU_SECRET_KEY')
 
     TECHSHOW_MAIL_SUBJECT_PREFIX = '[TechShow]'
     TECHSHOW_MAIL_SENDER = 'TechShow Admin <admin@techshow.com>'

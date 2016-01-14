@@ -25,9 +25,9 @@
 
             var initOpBtn = function () {
 
-                $('.channel-block').click(function () {
+                $('.channel-disable').click(function () {
                     var channelId = $(this).data('channel-id');
-                    var url = '/admin/channels/' + channelId + '/block';
+                    var url = '/admin/channels/' + channelId + '/disable';
                     WarningSwal('确认封禁聊天室"' + $(this).data('channel-name') + '"吗?', function () {
                         var success = false;
                         $.post(url, function (data, status, xhr) {
@@ -47,9 +47,9 @@
                     });
                 });
 
-                $('.channel-release').click(function () {
+                $('.channel-enable').click(function () {
                     var channelId = $(this).data('channel-id');
-                    var url = '/admin/channels/' + channelId + '/release';
+                    var url = '/admin/channels/' + channelId + '/enable';
                     WarningSwal('确认解禁聊天室"' + $(this).data('channel-name') + '"吗?', function () {
                         var success = false;
                         $.post(url, function (data, status, xhr) {
@@ -73,12 +73,25 @@
     </script>
 {% endblock %}
 
+{% block heading_text %}频道管理{% endblock %}
+
+{% block breadcrumb %}
+    {{ super() }}
+    <li>
+        <a href="{{ url_for('admin.channel_index') }}">频道</a>
+    </li>
+{% endblock %}
+
 {% block content %}
     <div class="row">
         <div class="col-lg-12">
+
             <div class="ibox float-e-margins">
                 <div class="ibox-title">
                     <h5>频道列表</h5>
+                    <div class="ibox-tools">
+                        <a href="{{ url_for('admin.thumbnail_index') }}" class="btn btn-primary btn-xs">背景图管理</a>
+                    </div>
                 </div>
                 <div class="ibox-content">
                     <div class="table-responsive">
@@ -106,7 +119,7 @@
                                     <td>{{ channel.stopped_at if channel.stopped_at else '未结束' }}</td>
                                     <td>
                                         {% if channel.is_banned %}
-                                            <button class="btn btn-xs btn-primary channel-release" type="button"
+                                            <button class="btn btn-xs btn-primary channel-enable" type="button"
                                                     data-channel-name="{{ channel.title }}"
                                                     data-channel-id={{ channel.id }}
                                             >
@@ -115,7 +128,7 @@
                                             </button>
                                         {% elif channel.is_closed or channel.is_new %}
                                         {% else %}
-                                            <button class="btn btn-xs btn-danger channel-block" type="button"
+                                            <button class="btn btn-xs btn-danger channel-disable" type="button"
                                                     data-channel-name="{{ channel.title }}"
                                                     data-channel-id={{ channel.id }}
                                             >

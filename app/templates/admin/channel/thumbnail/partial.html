@@ -1,0 +1,14 @@
+<div class="file-box">
+    <div class="file">
+        <div class="img">
+            <img class="img-responsive" src="{{ item.url }}?imageView2/0/w/250">
+            <div class="overlay" data-id="{{ item.id }}">
+                <i class="fa fa-times-circle fa-2x"></i>
+            </div>
+        </div>
+        <div class="file-name">
+            {{ item.name }}<br>
+            <small>上传于: {{ item.created_at }}</small>
+        </div>
+    </div>
+</div>

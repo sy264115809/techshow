@@ -19,10 +19,14 @@
                     <div class="navbar-collapse collapse" id="navbar">
                         <ul class="nav navbar-nav">
                             <li>
-                                <a aria-expanded="false" role="button" href="{{ url_for('admin.channel_index') }}">频道</a>
+                                <a aria-expanded="false" role="button"
+                                   href="{{ url_for('admin.channel_index') }}">频道</a>
                             </li>
                             <li>
                                 <a aria-expanded="false" role="button" href="{{ url_for('admin.user_index') }}">用户</a>
+                            </li>
+                            <li>
+                                <a aria-expanded="false" role="button" href="{{ url_for('admin.thumbnail_index') }}">背景图管理</a>
                             </li>
                             <li class="dropdown">
                                 <a aria-expanded="false" role="button" href="#" class="dropdown-toggle"
@@ -50,6 +54,20 @@
                     </div>
                 </nav>
             </div>
+
+            <div class="row wrapper border-bottom white-bg page-heading">
+                <div class="col-lg-10">
+                    <h2>{% block heading_text %}主页{% endblock %}</h2>
+                    <ol class="breadcrumb">
+                        {% block breadcrumb %}
+                            <li>
+                                <a href="{{ url_for('admin.admin_index') }}">主页</a>
+                            </li>
+                        {% endblock %}
+                    </ol>
+                </div>
+            </div>
+
             <div class="wrapper wrapper-content">
                 {% block content %}
                 {% endblock %}

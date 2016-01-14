@@ -1,0 +1,124 @@
+{% extends 'admin/channel/index.html' %}
+
+{% block js %}
+    {{ js_file('js/plugins/qiniu/plupload.full.min.js') }}
+    {{ js_file('js/plugins/qiniu/qiniu.js') }}
+    {{ js_file('js/plugins/qiniu/main.js') }}
+
+    <script>
+        $(function () {
+            // get token and domain from server
+            $.getJSON('/admin/uptoken', function (data) {
+                createUploader(data);
+            });
+
+            var createUploader = function (data) {
+                var options = {};
+                options.browse_button = 'upload-btn'; //上传按钮button的ID **必需**
+                options.domain = data.domain; //我们的七牛云存储空间 **必需**
+                options.uptoken = data.uptoken; //上传token **必需**
+                options.auto_start = true;
+                options.dragdrop = true;
+                options.multi_selection = true;
+                options.init = {};
+                options.init.FileUploaded = function (up, file, result) {
+                    var r = $.parseJSON(result);
+                    $.post('/admin/thumbnails', {key: r.key, name: file.name}, function (data) {
+                        if (data.error) {
+                            toastr.error(data.error);
+                        } else {
+                            toastr.success('上传成功');
+                            list.prepend(data);
+                            adjustPaginate(1);
+                        }
+                    });
+                };
+                return initUploader(options);
+            };
+
+            var list = $('#thumbnail-list');
+            var totalItems = $('#total-items');
+            var rightEdge = $('#right-edge');
+            var paginate = $('#paginate');
+            var nonePlaceholder = $('#none-placeholder');
+
+            var adjustPaginate = function (num) {
+                var total = parseInt(totalItems.text()) + num;
+                totalItems.text(total);
+                var right = parseInt(rightEdge.text()) + num;
+                rightEdge.text(right);
+
+                if (total == 0) {
+                    paginate.hide();
+                    nonePlaceholder.show();
+                } else {
+                    paginate.show();
+                    nonePlaceholder.hide();
+                }
+            };
+            adjustPaginate(0);
+
+            list.on('click', '.overlay', function () {
+                var $this = $(this);
+                $.post('/admin/thumbnails/' + $this.data('id') + 'delete/', function () {
+                    toastr.success('删除成功');
+                    adjustPaginate(-1);
+                });
+                $this.parents('.file-box:first').remove();
+            });
+
+            list.on('mouseenter', '.file-box', function () {
+                $(this).addClass('animated pulse');
+            });
+
+            list.on('mouseleave', '.file-box', function () {
+                var that = $(this);
+                setTimeout(function () {
+                    that.removeClass('animated pulse');
+                }, 2000)
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block heading_text %}背景图管理{% endblock %}
+
+{% block breadcrumb %}
+    {{ super() }}
+    <li>
+        <a>背景图</a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-lg-3">
+            <div class="ibox">
+                <div class="ibox-content">
+                    <div class="file-manager">
+                        <h2>上传区</h2>
+                        <div class="alert alert-danger"><strong>请注意版权问题!!!!</strong></div>
+                        <div class="hr-line-dashed"></div>
+                        <div class="dropzone" id="upload-btn">拖拽或点击上传</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-9 animated fadeInRight">
+            <div class="row">
+                <div class="col-lg-12" id='thumbnail-list'>
+                    {% for item in thumbnails.items %}
+                        {% include 'admin/channel/thumbnail/partial.html' %}
+                    {% endfor %}
+
+                    <div class="col-lg-12" id="paginate">
+                        {{ render_pagination(thumbnails, 'admin.thumbnails_index') }}
+                    </div>
+                    <div class="ibox" id="none-placeholder">
+                        <div class="ibox-content text-center">还没有背景图</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
