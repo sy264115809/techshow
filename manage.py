@@ -8,7 +8,7 @@ if os.path.exists('.env'):
         if len(var) == 2:
             os.environ[var[0]] = var[1]
 
-from app import create_app, db, celery
+from app import create_app, db, celery, pili
 from app.models.user import User
 from app.models.channel import Channel
 from flask_script import Manager, Shell
@@ -21,7 +21,7 @@ manager = Manager(app)
 
 
 def make_shell_context():
-    return dict(app = app, db = db, User = User, Channel = Channel)
+    return dict(app = app, db = db, User = User, Channel = Channel, pili = pili)
 
 
 manager.add_command("shell", Shell(make_context = make_shell_context))
