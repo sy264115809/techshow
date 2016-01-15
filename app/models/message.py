@@ -20,7 +20,7 @@ class Message(db.Model):
     @classmethod
     @cache.memoize(60)
     def get_messages_by_offset(cls, channel_id, offset):
-        return cls.query.filter_by(channel_id = channel_id, offset = offset, ).all()
+        return cls.query.options(db.joinedload('author')).filter_by(channel_id = channel_id, offset = offset).all()
 
     def to_json(self):
         return {

@@ -442,6 +442,9 @@ def get_channel_messages(channel_id):
     ret = {}
     count = 0
     for o in range(start, offset):
+        if o > channel.duration:
+            break
+
         messages = Message.get_messages_by_offset(channel.id, o)
         if limit:
             messages = messages[:limit]
