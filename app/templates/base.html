@@ -1,0 +1,21 @@
+{% from "admin/base/html_utils.html" import css_file, js_file %}
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechShow{% block title %}{% endblock %}</title>
+
+    {{ css_file("css/bootstrap.min.css") }}
+    {{ css_file("css/font-awesome.min.css") }}
+    {{ css_file("css/style.css") }}
+    {% block css %}{% endblock %}
+</head>
+<body class="skin {% block bodyClass %}{% endblock %}">
+{% block body %}
+{% endblock %}
+{{ js_file("js/jquery-2.1.1.js") }}
+{{ js_file("js/bootstrap.min.js") }}
+{% block js %}{% endblock %}
+</body>
+</html>
