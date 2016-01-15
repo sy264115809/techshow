@@ -250,12 +250,16 @@ class Channel(db.Model):
 class Complaint(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    reporter = db.relationship('User', backref = db.backref('complaints', lazy = 'dynamic'))
+    reporter = db.relationship('User', foreign_keys = [reporter_id],
+                               backref = db.backref('report_complaints', lazy = 'dynamic'))
     channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'))
     channel = db.relationship('Channel', backref = db.backref('complaints', lazy = 'dynamic'))
     reason_type = db.Column(db.Integer)
     reason = db.Column(db.Text)
-    is_read = db.Column(db.Boolean, default = False)
+    handler_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    handler = db.relationship('User', foreign_keys = [handler_id],
+                              backref = db.backref('handle_complaints', lazy = 'dynamic'))
+    created_at = db.Column(db.DateTime, default = datetime.now)
 
     def __init__(self, **kwargs):
         super(Complaint, self).__init__(**kwargs)

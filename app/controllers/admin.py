@@ -6,7 +6,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.models.user import User
-from app.models.channel import Channel, ChannelStatus, Thumbnail
+from app.models.channel import Channel, ChannelStatus, Thumbnail, Complaint
 from app.controllers.channel import destroy_rongcloud_chatroom
 from app.http.request import paginate, parse_params, Rule
 from app.http.response import success
@@ -57,6 +57,15 @@ def channel_index():
     p = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(
             *paginate())
     return render_template('admin/channel/index.html', channels = p, filter = _filter)
+
+
+@admin_endpoint.route('/channels/<int:channel_id>', methods = ['GET'])
+@login_required
+def channel_detail(channel_id):
+    channel = Channel.query.get_or_404(channel_id)
+    complaints = Complaint.query.filter_by(channel = channel).order_by(Complaint.created_at.desc()).paginate(
+            *paginate())
+    return render_template('admin/channel/detail.html', channel = channel, complaints = complaints)
 
 
 @admin_endpoint.route('/channels/<int:channel_id>/disable', methods = ['POST'])
@@ -180,4 +189,13 @@ def thumbnail_delete(thumbnail_id):
     if t:
         db.session.delete(t)
         db.session.commit()
+    return success()
+
+
+@admin_endpoint.route('/complaints/<complaint_id>/handle', methods = ['POST'])
+@login_required
+def complaint_handle(complaint_id):
+    complaint = Complaint.query.get_or_404(complaint_id)
+    complaint.handler = current_user
+    db.session.commit()
     return success()

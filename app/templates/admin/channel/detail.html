@@ -1,0 +1,130 @@
+{% extends 'admin/channel/index.html' %}
+
+{% block heading_text %}{{ channel.title }}{% endblock %}
+
+{% block breadcrumb %}
+    {{ super() }}
+    <li>
+        <a>详情</a>
+    </li>
+{% endblock %}
+
+{% block js %}
+    {{ js_file('js/admin/channel.js') }}
+    <script>
+        $(function () {
+            $('.complaint-handle').click(function () {
+                var success = false;
+                $.post('/admin/complaints/' + $(this).data('complaint-id') + '/handle',
+                        function (data, status, xhr) {
+                            if (xhr.code = 200) {
+                                success = true
+                            }
+                        }).complete(function () {
+                    if (success) {
+                        SuccessSwal('标记成功');
+                        setTimeout('location.reload()', 3000);
+                    } else {
+                        FailedSwal('标记失败');
+                    }
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="row animated fadeInRight">
+        <div class="col-lg-4">
+            <div class="contact-box">
+                <div class="col-sm-4 text-center">
+                    <img alt="image" class="img-responsive" src="{{ channel.thumbnail }}">
+                    <div class="m-t-sm h3">{{ channel.title }}</div>
+                    <div class="m-t-sm">
+                        {{ helper.channelOpBtn(channel) }}
+                    </div>
+                </div>
+                <div class="col-sm-8">
+                    <h4><strong></strong></h4>
+                    <table class="table table-responsive">
+                        <tbody>
+                        <tr>
+                            <td>直播人</td>
+                            <td>
+                                <a href="{{ url_for('admin.user_detail', user_id=channel.owner.id) }}"
+                                   class="label label-success">{{ channel.owner.nickname }}</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>频道状态</td>
+                            <td data-status="{{ channel.status }}"></td>
+                        </tr>
+                        <tr>
+                            <td>开始时间</td>
+                            <td>{{ channel.started_at }}</td>
+                        </tr>
+                        <tr>
+                            <td>结束时间</td>
+                            <td>{{ channel.stopped_at if channel.stopped_at else '未结束' }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+                <div class="clearfix"></div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="ibox">
+                <div class="ibox-title">
+                    <h4>{{ channel.title }}的投诉列表</h4>
+                </div>
+                <div class="ibox-content">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>投诉人</th>
+                                <th>投诉内容</th>
+                                <th>投诉时间</th>
+                                <th>操作</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+                            {% for complaint in complaints.items %}
+                                <tr data-expanded="true">
+                                    <td>{{ complaint.id }}</td>
+                                    <td>
+                                        <a href="{{ url_for('admin.user_detail', user_id=complaint.reporter.id) }}"
+                                           class="label label-success">{{ complaint.reporter.nickname }}</a>
+                                    </td>
+                                    <td style="max-width: 200px;">{{ complaint.reason }}</td>
+                                    <td>{{ complaint.created_at }}</td>
+                                    <td>
+                                        {% if complaint.handler %}
+                                            <a href="{{ url_for('admin.user_detail', user_id=complaint.handler.id) }}"
+                                               class="label">已由 {{ complaint.handler.nickname }} 处理</a>
+                                        {% else %}
+                                            <button class="btn btn-xs btn-primary btn-rounded complaint-handle"
+                                                    type="button"
+                                                    data-complaint-id={{ complaint.id }}
+                                            >
+                                                <i class="fa fa-check"></i>
+                                                <span class="bold">已阅</span>
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {{ render_pagination(complaints, 'admin.channel_detail', channel_id=channel.id) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

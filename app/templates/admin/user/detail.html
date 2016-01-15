@@ -32,37 +32,37 @@
                     <table class="table table-responsive">
                         <tbody>
                         <tr>
-                            <th>姓名</th>
-                            <th>{{ user.name if user.name else '未提供' }}</th>
+                            <td>姓名</td>
+                            <td>{{ user.name if user.name else '未提供' }}</td>
                         </tr>
                         <tr>
-                            <th>性别</th>
-                            <th>
+                            <td>性别</td>
+                            <td>
                                 {% if user.gender==None %}未提供
                                 {% elif user.gender==0 %}男
                                 {% elif user.gender==1 %}女
                                 {% endif %}
-                            </th>
+                            </td>
                         </tr>
                         <tr>
-                            <th>创建时间</th>
-                            <th>{{ user.created_at }}</th>
+                            <td>创建时间</td>
+                            <td>{{ user.created_at }}</td>
                         </tr>
                         <tr>
-                            <th>最近一次登录</th>
-                            <th>{{ user.current_sign_in_at }}</th>
+                            <td>最近一次登录</td>
+                            <td>{{ user.current_sign_in_at }}</td>
                         </tr>
                         <tr>
-                            <th>登录次数</th>
-                            <th>{{ user.sign_in_count }}</th>
+                            <td>登录次数</td>
+                            <td>{{ user.sign_in_count }}</td>
                         </tr>
                         <tr>
-                            <th>用户状态</th>
-                            <th>{{ helper.status(user) }}</th>
+                            <td>用户状态</td>
+                            <td>{{ helper.status(user) }}</td>
                         </tr>
                         <tr>
-                            <th>流状态</th>
-                            <th>{{ helper.streamStatus(user) }}</th>
+                            <td>流状态</td>
+                            <td>{{ helper.streamStatus(user) }}</td>
                         </tr>
                         </tbody>
                     </table>
