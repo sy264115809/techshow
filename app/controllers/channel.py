@@ -424,7 +424,7 @@ def get_channel_messages(channel_id):
     """
     channel = get_channel(channel_id, access_control = True)
 
-    start = parse_int('s', default = 0, condition = lambda s: s >= 0)  # 相对起始时间
+    start = parse_int('s', default = 1, condition = lambda s: s >= 1)  # 相对起始时间
     offset = parse_int('o', default = 10, condition = lambda o: o > 0)  # 相对起始时间的偏移
     limit = parse_int('l', default = None, condition = lambda l: l > 0)  # 返回条目限制
 
@@ -441,7 +441,7 @@ def get_channel_messages(channel_id):
 
     ret = {}
     count = 0
-    for o in range(start, offset):
+    for o in range(start, start + offset):
         if o > channel.duration:
             break
 
