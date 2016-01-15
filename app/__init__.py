@@ -1,5 +1,5 @@
 # coding=utf8
-from flask import Flask
+from flask import Flask, render_template
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_cache import Cache
@@ -43,5 +43,8 @@ def create_app(config_name):
 
     # error handler
     app.register_error_handler(APIException, lambda e: exception(e))
+
+    app.register_error_handler(404, lambda e: render_template('404.html'))
+    app.register_error_handler(500, lambda e: render_template('500.html'))
 
     return app

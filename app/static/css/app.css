@@ -1,25 +1,38 @@
-.overlay {
-    transition: all 250ms ease-in-out 0s;
-    display: none;
+body {
+    background-color: #272F3E;
+}
+
+.middle-container {
+    height: 200px;
     position: absolute;
-    color: white;
-    right: -10px;
-    top: -10px;
-}
-
-.img:hover .overlay {
-    display: block;
-    cursor: pointer;
-    text-shadow: 1px 2px 10px black;
-}
-
-.dropzone {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    margin: auto;
     text-align: center;
-    font-size: 16px;
-    border: 1px solid rgba(0, 0, 0, 0.03);
-    border-radius: 3px;
-    height: 180px;
-    line-height: 180px;
-    background: rgba(0, 0, 0, 0.03);
-    cursor: pointer;
+}
+
+.middle-container .bulletin {
+    font-size: 120px;
+}
+
+.middle-container .bulletin img {
+    width: 64px;
+}
+.middle-container .oauth-area .oauth-text {
+    margin-top: 60px;
+}
+
+.middle-container .oauth-area .oauth-left {
+    width: 64px;
+}
+
+.middle-container .oauth-area .oauth-line {
+    width: 120px;
+    margin: 0 24px;
+}
+
+.middle-container .oauth-area .oauth-right {
+    width: 64px;
 }

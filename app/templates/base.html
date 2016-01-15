@@ -9,11 +9,16 @@
     {{ css_file("css/bootstrap.min.css") }}
     {{ css_file("css/font-awesome.min.css") }}
     {{ css_file("css/style.css") }}
+    {{ css_file("css/app.css") }}
     {% block css %}{% endblock %}
 </head>
 <body class="skin {% block bodyClass %}{% endblock %}">
-{% block body %}
-{% endblock %}
+
+<div class="middle-container">
+    {% block content %}
+    {% endblock %}
+</div>
+
 {{ js_file("js/jquery-2.1.1.js") }}
 {{ js_file("js/bootstrap.min.js") }}
 {% block js %}{% endblock %}
