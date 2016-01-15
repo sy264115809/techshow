@@ -1,4 +1,5 @@
 # coding=utf-8
+from random import randint
 from datetime import datetime
 from time import mktime, strftime, localtime
 from flask_login import current_user, current_app
@@ -56,6 +57,7 @@ class Channel(db.Model):
     def __init__(self, **kwargs):
         self.owner = current_user
         self.stream_id = current_user.stream_id
+        self.thumbnail = Thumbnail.random_url()
         super(Channel, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -273,3 +275,15 @@ class Thumbnail(db.Model):
     @property
     def url(self):
         return 'http://%s/%s' % (self.domain, self.key)
+
+    @staticmethod
+    def random_url():
+        amount = Thumbnail.query.count()
+        if amount == 0:
+            return None
+
+        thumbnail = None
+        while thumbnail is None:
+            thumbnail = Thumbnail.query.get(randint(1, amount))
+
+        return thumbnail.url
