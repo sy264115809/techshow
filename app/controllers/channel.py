@@ -425,21 +425,31 @@ def get_channel_messages(channel_id):
     channel = get_channel(channel_id, access_control = True)
 
     start = parse_int('s', default = 0, condition = lambda s: s >= 0)  # 相对起始时间
-    offset = parse_int('o', default = 10, condition = lambda o: o > 0)  # 相对起始时间的便宜
+    offset = parse_int('o', default = 10, condition = lambda o: o > 0)  # 相对起始时间的偏移
     limit = parse_int('l', default = None, condition = lambda l: l > 0)  # 返回条目限制
 
-    messages = Message.query.filter(
-            Message.channel == channel,
-            Message.offset >= start,
-            Message.offset <= start + offset
-    ).order_by(
-            Message.created_at.desc()
-    ).limit(limit).all()
+    # messages = Message.query.filter(
+    #         Message.channel == channel,
+    #         Message.offset >= start,
+    #         Message.offset <= start + offset
+    # ).order_by(
+    #         Message.offset,
+    #         Message.created_at.desc()
+    # ).limit(limit).all()
 
-    ret = map(lambda msg: msg.to_json(), messages)
+    # ret = map(lambda msg: msg.to_json(), messages)
+
+    ret = {}
+    count = 0
+    for o in range(start, offset):
+        messages = Message.get_messages_by_offset(channel.id, o)
+        if limit:
+            messages = messages[:limit]
+        count += len(messages)
+        ret[o] = map(lambda msg: msg.to_json(), messages)
 
     return success({
-        'count': len(ret),
+        'count': count,
         'messages': ret,
         'start': start,
         'offset': offset,
@@ -471,10 +481,22 @@ def send_mock_msg():
     ]
     channel_id = parse_params(request.args, Rule('id', must = True))['id']
     cnt = parse_int('cnt', 100, lambda c: c <= 100)
+    save = request.args.get('save')
     for i in range(0, cnt):
         user = choice(mock_users)
         message = ''.join(sample(ascii_letters + digits, randint(1, 25)))
         send_rongcloud_message.delay(user['id'], user['name'], user['avatar'], channel_id, message)
+
+        if save:
+            c = get_channel(channel_id)
+            m = Message(
+                    author_id = user['id'],
+                    channel = c,
+                    content = message,
+                    offset = (datetime.now() - c.started_at).seconds
+            )
+            db.session.add(m)
+            db.session.commit()
     return success()
 
 

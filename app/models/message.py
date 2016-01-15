@@ -1,7 +1,7 @@
 # encoding=utf-8
 from datetime import datetime
 
-from app import db
+from app import db, cache
 
 
 class Message(db.Model):
@@ -16,6 +16,11 @@ class Message(db.Model):
 
     def __init__(self, **kwargs):
         super(Message, self).__init__(**kwargs)
+
+    @classmethod
+    @cache.memoize(60)
+    def get_messages_by_offset(cls, channel_id, offset):
+        return cls.query.filter_by(channel_id = channel_id, offset = offset, ).all()
 
     def to_json(self):
         return {
