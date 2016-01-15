@@ -447,7 +447,7 @@ def get_channel_messages(channel_id):
 
         messages = Message.get_messages_by_offset(channel.id, o)
         if limit:
-            messages = messages[:limit]
+            messages = messages[-limit:]
         count += len(messages)
         ret[o] = map(lambda msg: msg.to_json(), messages)
 
