@@ -113,7 +113,7 @@ def login_by_github_callback():
         login_user(user)
         return redirect(url_for('admin.admin_index'))
 
-    return render_template('login.html')
+    return render_template('github_login.html')
 
 
 @users_endpoint.route('/login/qiniu/callback', methods = ['GET'])
@@ -147,7 +147,7 @@ def login_by_qiniu_callback():
         login_user(user)
         return redirect(url_for('admin.admin_index'))
 
-    return render_template('login.html')
+    return render_template('qiniu_login.html')
 
 
 @users_endpoint.route('/login', methods = ['POST'])

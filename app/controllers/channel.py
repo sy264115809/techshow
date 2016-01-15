@@ -4,7 +4,7 @@ from random import randint, sample, choice
 from string import ascii_letters, digits
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, json, url_for
+from flask import Blueprint, current_app, request, json, url_for, render_template
 from flask_login import login_required, current_user
 
 from .. import db, celery
@@ -504,10 +504,17 @@ def send_mock_msg():
 
 
 @channels_endpoint.route('/chatroom/<int:channel_id>', methods = ['GET'])
+@login_required
 def chatroom_info(channel_id):
     return success({
         'info': ApiClient().chatroom_query(channel_id)
     })
+
+
+@channels_endpoint.route('/<int:channel_id>/share', methods = ['GET'])
+def channel_share(channel_id):
+    channel = Channel.query.get_or_404(channel_id)
+    return render_template('share.html', channel = channel)
 
 
 def get_channel(channel_id, access_control = False, must_owner = False):
