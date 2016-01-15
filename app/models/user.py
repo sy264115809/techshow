@@ -68,6 +68,7 @@ class User(db.Model, UserMixin):
         self.get_auth_code_count = 0
         self.sign_in_count = 0
         self.stream_id = pili.create_stream().id
+        self.avatar = 'https://dn-pili-static.qbox.me/images/signin-nxq.png'
         super(User, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -103,7 +104,7 @@ class User(db.Model, UserMixin):
                 token = ApiClient().user_get_token(
                         user_id = self.id,
                         name = self.nickname or self.name,
-                        portrait_uri = self.avatar or 'https://avatars.githubusercontent.com/u/16420492'
+                        portrait_uri = self.avatar
                 ).get('token')
             except ClientError as exc:
                 current_app.logger.error('generate rong cloud token error: %s', exc)
