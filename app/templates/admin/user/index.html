@@ -1,0 +1,66 @@
+{% extends 'admin/base/base_dashboard.html' %}
+{% import 'admin/user/helper.html' as helper %}
+
+{% block heading_text %}用户管理{% endblock %}
+
+{% block breadcrumb %}
+    {{ super() }}
+    <li>
+        <a href="{{ url_for('admin.user_index') }}">用户</a>
+    </li>
+{% endblock %}
+
+{% block js %}
+    {{ js_file('js/admin/user.js') }}
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="ibox float-e-margins">
+                <div class="ibox-title">
+                    <h5>用户列表</h5>
+                </div>
+                <div class="ibox-content">
+                    <div class="table-responsive">
+                        <table class=" table">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>头像</th>
+                                <th>昵称
+                                <th>Github帐号</th>
+                                <th>七牛账号</th>
+                                <th>用户状态</th>
+                                <th>操作</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+                            {% for user in users.items %}
+                                <tr data-expanded="true">
+                                    <td><a href="/admin/users/{{ user.id }}"
+                                           class="label label-success">{{ user.id }}</a></td>
+                                    <th><img src="{{ user.avatar }}" class="img-circle" width="24"></th>
+                                    <td>{{ user.nickname }}</td>
+                                    <td>{{ user.github_email if user.github_email else '-' }}</td>
+                                    <td>{{ user.qiniu_email if user.qiniu_email else '-' }}</td>
+                                    <td>
+                                        {{ helper.status(user) }}
+                                        {{ helper.streamStatus(user) }}
+                                    </td>
+                                    <td>
+                                        {{ helper.banOp(user) }}
+                                        {{ helper.streamOp(user) }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {{ render_pagination(users, 'admin.user_index') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

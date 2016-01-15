@@ -268,11 +268,3 @@ def load_user_from_session(user_id):
 
 def _get_auth_code():
     return random.randint(1000, 9999)
-
-
-def _github_oauth():
-    return OAuth2Service(**current_app.config['OAUTH_GITHUB'])
-
-
-def _qiniu_oauth():
-    return OAuth2Service(**current_app.config['OAUTH_QINIU'])

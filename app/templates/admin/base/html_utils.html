@@ -16,10 +16,10 @@
 
             {% if pagination.has_prev %}
                 <li class="paginate_button" id="paginate-previous">
-                    <a href="{{ url_for(endpoint, p=pagination.prev_num, l=pagination.per_page) }}"> 前一页 </a>
+                    <a href="{{ url_for(endpoint, p=pagination.prev_num, l=pagination.per_page, **kwargs) }}"> 前一页 </a>
                 </li>
             {% else %}
-                <li class="paginate_button disabled" id="paginate-previous">
+                <li class="paginate_button btn disabled" id="paginate-previous">
                     <a> 前一页 </a>
                 </li>
             {% endif %}
@@ -28,11 +28,11 @@
                 {% if page %}
                     {% if page != pagination.page %}
                         <li class="paginate_button" id="paginate-{{ page }}">
-                            <a href="{{ url_for(endpoint, p=page, l=pagination.per_page) }}">{{ page }}</a>
+                            <a href="{{ url_for(endpoint, p=page, l=pagination.per_page, **kwargs) }}">{{ page }}</a>
                         </li>
                     {% else %}
-                        <li class="paginate_button disabled" id="paginate-current">
-                            <a href="#">{{ page }}</a>
+                        <li class="paginate_button disabled active" id="paginate-current">
+                            <a>{{ page }}</a>
                         </li>
                     {% endif %}
                 {% else %}
@@ -47,7 +47,7 @@
                     <a href="{{ url_for(endpoint, p=pagination.next_num, l=pagination.per_page, **kwargs) }}"> 后一页 </a>
                 </li>
             {% else %}
-                <li class="paginate_button disabled" id="paginate-next">
+                <li class="paginate_button btn disabled" id="paginate-next">
                     <a> 后一页 </a>
                 </li>
             {% endif %}

@@ -47,7 +47,8 @@ class User(db.Model, UserMixin):
     rong_cloud_token = db.Column(db.String(128))
 
     stream_id = db.Column(db.String(64))
-    stream_status = db.Column(db.Integer, default = StreamStatus.unborn)
+    stream_status = db.Column(db.Integer, default = StreamStatus.available)
+    is_stream_enabled = db.Column(db.Boolean, default = True)
 
     get_auth_code_count = db.Column(db.Integer, default = 0)
     last_get_auth_code_at = db.Column(db.DateTime)
@@ -115,11 +116,25 @@ class User(db.Model, UserMixin):
 
     def disable_stream(self):
         self.stream.disable()
-        self.stream_status = StreamStatus.unavailable
+        self.is_stream_enabled = False
+        db.session.commit()
 
     def enable_stream(self):
         self.stream.enable()
+        self.is_stream_enabled = True
+        db.session.commit()
+
+    def ban(self):
+        self.disable_stream()
+        self.stream_status = StreamStatus.unavailable
+        self.is_banned = True
+        db.session.commit()
+
+    def unban(self):
+        self.enable_stream()
         self.stream_status = StreamStatus.available
+        self.is_banned = False
+        db.session.commit()
 
     def to_json(self):
         return {

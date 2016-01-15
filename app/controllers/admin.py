@@ -2,10 +2,12 @@
 import qiniu
 from flask import Blueprint, request, current_app, render_template, url_for, redirect, json, jsonify
 from flask_login import current_user, login_required, logout_user
+from sqlalchemy import or_
 
 from app import db
+from app.models.user import User
 from app.models.channel import Channel, Thumbnail
-from app.controllers.channel import destroy_rongcloud_chatroom, get_channel
+from app.controllers.channel import destroy_rongcloud_chatroom
 from app.http.request import paginate, parse_params, Rule
 from app.http.response import success
 
@@ -54,26 +56,73 @@ def channel_index():
 @admin_endpoint.route('/channels/<int:channel_id>/disable', methods = ['POST'])
 @login_required
 def channel_disable(channel_id):
-    channel = get_channel(channel_id)
-    channel.banned(destroy_rongcloud_chatroom.s(channel.id))
+    channel = Channel.query.get_or_404(channel_id)
+    channel.disable(destroy_rongcloud_chatroom.s(channel.id))
     return success()
 
 
 @admin_endpoint.route('/channels/<int:channel_id>/enable', methods = ['POST'])
 @login_required
 def channel_enable(channel_id):
-    channel = get_channel(channel_id)
-    channel.release()
+    channel = Channel.query.get_or_404(channel_id)
+    channel.enable()
     return success()
 
 
 @admin_endpoint.route('/users/index', methods = ['GET'])
 @login_required
 def user_index():
-    pass
+    q = request.args.get('q')
+    qs = User.query
+    if q:
+        qs = qs.filter(or_(User.github_email == q, User.qiniu_email == q, User.nickname == q))
+
+    p = qs.paginate(*paginate())
+    return render_template('admin/user/index.html', users = p)
+
+
+@admin_endpoint.route('/users/<user_id>', methods = ['GET'])
+@login_required
+def user_detail(user_id):
+    user = User.query.get_or_404(user_id)
+    channels = Channel.query.filter_by(owner_id = user_id).order_by(Channel.started_at.desc()).paginate(*paginate())
+    return render_template('admin/user/detail.html', user = user, channels = channels)
+
+
+@admin_endpoint.route('/users/<user_id>/stream/enable', methods = ['POST'])
+@login_required
+def user_stream_enable(user_id):
+    user = User.query.get_or_404(user_id)
+    user.enable_stream()
+    return success()
+
+
+@admin_endpoint.route('/users/<user_id>/stream/disable', methods = ['POST'])
+@login_required
+def user_stream_disable(user_id):
+    user = User.query.get_or_404(user_id)
+    user.disable_stream()
+    return success()
+
+
+@admin_endpoint.route('/users/<user_id>/ban', methods = ['POST'])
+@login_required
+def user_ban(user_id):
+    user = User.query.get_or_404(user_id)
+    user.ban()
+    return success()
+
+
+@admin_endpoint.route('/users/<user_id>/unban', methods = ['POST'])
+@login_required
+def user_unban(user_id):
+    user = User.query.get_or_404(user_id)
+    user.unban()
+    return success()
 
 
 @admin_endpoint.route('/uptoken', methods = ['GET'])
+@login_required
 def uptoken():
     policy = {
         'returnBody': json.dumps({
