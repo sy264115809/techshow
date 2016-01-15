@@ -6,7 +6,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.models.user import User
-from app.models.channel import Channel, Thumbnail
+from app.models.channel import Channel, ChannelStatus, Thumbnail
 from app.controllers.channel import destroy_rongcloud_chatroom
 from app.http.request import paginate, parse_params, Rule
 from app.http.response import success
@@ -49,8 +49,14 @@ def admin_logout():
 @admin_endpoint.route('/channels/index', methods = ['GET'])
 @login_required
 def channel_index():
-    p = Channel.query.filter_by().order_by(Channel.started_at.desc()).paginate(*paginate())
-    return render_template('admin/channel/index.html', channels = p)
+    q = {}
+    _filter = request.args.get('filter')
+    if _filter == 'publishing':
+        q['status'] = ChannelStatus.publishing
+
+    p = Channel.query.filter_by(**q).order_by(Channel.started_at.desc()).paginate(
+            *paginate())
+    return render_template('admin/channel/index.html', channels = p, filter = _filter)
 
 
 @admin_endpoint.route('/channels/<int:channel_id>/disable', methods = ['POST'])
