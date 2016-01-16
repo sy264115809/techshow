@@ -828,7 +828,7 @@ API_BAD_REQUEST
 **请求**
 
 ```
-POST /channels/stream/<int id>
+GET /channels/stream/<int id>
 Authorization: Basic Auth
 ```
 
