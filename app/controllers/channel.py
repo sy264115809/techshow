@@ -366,7 +366,8 @@ def send_message(channel_id):
 
     if channel.is_publishing:
         # @task 如果正在推流,调用融云发送聊天室消息
-        send_task = send_rongcloud_message.delay(current_user.id, current_user.name, current_user.avatar, channel_id,
+        send_task = send_rongcloud_message.delay(current_user.id, current_user.nickname, current_user.avatar,
+                                                 channel_id,
                                                  content)
         return success({
             'send_task': _task_url(send_task)
