@@ -111,9 +111,12 @@ def login_by_github_callback():
     # if user is admin, login it and redirect to admin index
     if user.github_email in current_app.config['ADMIN_GITHUB']:
         login_user(user)
-        return redirect(url_for('admin.admin_index'))
 
-    return render_template('oauth_pending.html', oauth_logo = '/static/images/github_logo.png')
+    # 如果是admin来请求oauth
+    if request.referrer == url_for('admin.admin_login', _external = True):
+        return redirect(url_for('admin.admin_index'))
+    else:
+        return render_template('oauth_pending.html', oauth_logo = '/static/images/github_logo.png')
 
 
 @users_endpoint.route('/login/qiniu/callback', methods = ['GET'])
@@ -145,9 +148,12 @@ def login_by_qiniu_callback():
     # if user is admin, login it and redirect to admin index
     if user.qiniu_email in current_app.config['ADMIN_QINIU']:
         login_user(user)
-        return redirect(url_for('admin.admin_index'))
 
-    return render_template('oauth_pending.html', oauth_logo = '/static/images/qiniu_logo.png')
+    # 如果是admin来请求oauth
+    if request.referrer == url_for('admin.admin_login', _external = True):
+        return redirect(url_for('admin.admin_index'))
+    else:
+        return render_template('oauth_pending.html', oauth_logo = '/static/images/qiniu_logo.png')
 
 
 @users_endpoint.route('/login', methods = ['POST'])
