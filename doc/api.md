@@ -67,6 +67,7 @@
 |`API_UNAUTHORIZED`|4010|unauthorized|未授权，一般是因为`api_token`不正确|
 |`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的登录验证码|
 |`API_OAUTH_FAIL`|4012|oauth fail|OAuth登录失败|
+|`API_USER_BANNED`|4013|user is banned|用户被禁用|
 |`API_MAX_CHANNEL_TOUCHED`|4031|touch maximum number of channels|达到最大频道数量|
 |`API_MESSAGE_TOO_FREQUENTLY`|4032|send meesage too frequently|发送消息频率太快|
 |`API_CHANNEL_INACCESSIBLE`|4033|channel is inaccessible|频道不处于`推流中`或`结束推流`的[状态](#channel-status)，不可访问|

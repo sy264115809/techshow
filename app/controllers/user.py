@@ -8,7 +8,7 @@ from flask_login import login_required, current_user, login_user
 from app import db, login_manager
 from app.models.user import User, UserGender
 from app.http.request import paginate, Rule, parse_params
-from app.http.response import success, InvalidAuthCode, UserNotFound, OAuthFail
+from app.http.response import success, InvalidAuthCode, UserNotFound, OAuthFail, UserBanned
 from app.http.oauth import OAuthSignIn
 
 users_endpoint = Blueprint('users', __name__, url_prefix = '/users')
@@ -147,7 +147,7 @@ def login_by_qiniu_callback():
         login_user(user)
         return redirect(url_for('admin.admin_index'))
 
-    return render_template('oauth_pending.html', oauth_logo='/static/images/qiniu_logo.png')
+    return render_template('oauth_pending.html', oauth_logo = '/static/images/qiniu_logo.png')
 
 
 @users_endpoint.route('/login', methods = ['POST'])
@@ -247,6 +247,9 @@ def load_user_from_request(request):
     if api_token:
         user = User.query.filter_by(api_token = api_token).first()
         if user:
+            if not user.is_active():
+                raise UserBanned()
+
             return user
 
     # next, try to login using Basic Auth
@@ -255,6 +258,8 @@ def load_user_from_request(request):
         api_token = api_token.username
         user = User.query.filter_by(api_token = api_token).first()
         if user:
+            if not user.is_active():
+                raise UserBanned()
             return user
 
     # finally, return None if both methods did not login the user
