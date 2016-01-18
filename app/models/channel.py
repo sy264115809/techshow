@@ -130,6 +130,21 @@ class Channel(db.Model):
             return True
         return False
 
+    def resume(self, callback_task = None):
+        """恢复频道为开始推流状态
+        :param callback_task: 回调的celery subtask
+        """
+        if self.is_published:
+            self.status = ChannelStatus.publishing
+            self.stopped_at = None
+            self.duration = None
+            self.owner.stream_status = StreamStatus.unavailable
+            db.session.commit()
+            if hasattr(callback_task, 'apply_async'):
+                return callback_task.apply_async()
+            return True
+        return False
+
     def finish(self, callback_task = None):
         """设置频道为结束推流状态
         :param callback_task: 回调的celery subtask
@@ -141,7 +156,10 @@ class Channel(db.Model):
             self.calc_duration()
             if self.duration == 0:
                 db.session.delete(self)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except:
+                db.session.rollback()
             if hasattr(callback_task, 'apply_async'):
                 return callback_task.apply_async()
             return True
@@ -286,8 +304,5 @@ class Thumbnail(db.Model):
         if amount == 0:
             return None
 
-        thumbnail = None
-        while thumbnail is None:
-            thumbnail = Thumbnail.query.get(randint(1, amount))
-
+        thumbnail = Thumbnail.query.order_by(db.func.rand()).first()
         return thumbnail.url

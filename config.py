@@ -7,6 +7,7 @@ class Config(object):
     SQLALCHEMY_TRACK_MODIFICATIONS = True
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     SQLALCHEMY_RECORD_QUERIES = True
+    # SQLALCHEMY_ECHO = True
 
     MAIL_SERVER = 'smtp.googlemail.com'
     MAIL_PORT = 587

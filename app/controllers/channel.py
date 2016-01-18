@@ -163,10 +163,8 @@ def publish(channel_id):
     # 开始推流, 并在融云中创建一个聊天室
     task = channel.publish(create_rongcloud_chatroom.s(channel.id, channel.title))
     resp['create_task'] = _task_url(task)
-    # if not current_app.config['DEBUG'] or True:
-    if True:
-        # 延迟10s启动频道存活状态监控
-        resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
+    # 延迟10s启动频道存活状态监控
+    resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
 
     return success(resp)
 
@@ -247,6 +245,31 @@ def finish(channel_id):
     return success({
         'finish_task': _task_url(task)
     })
+
+
+@channels_endpoint.route('/resume/<int:channel_id>', methods = ['POST'])
+@login_required
+def resume(channel_id):
+    """
+    恢复频道状态, 避免因客户端网络原因造成的断流而错误的将频道终结.
+    :param channel_id: 要恢复状态的频道id
+    :return:
+    """
+    channel = get_channel(channel_id, must_owner = True)
+    if not channel.is_published:
+        raise BadRequest('cannot resume channel while it is not at the published status')
+
+    # 如果当前流上没有比当前频道更新的频道,说明这是一次RESUME操作,重置流的状态为直播中.
+    if Channel.query.filter(Channel.stream_id == channel.stream_id, Channel.id > channel.id).count():
+        raise BadRequest('cannot resume channel while it is not the newest')
+
+    resp = {}
+    # 开始恢复推流, 并在融云中创建一个聊天室
+    task = channel.resume(create_rongcloud_chatroom.s(channel.id, channel.title))
+    resp['create_task'] = _task_url(task)
+    # 延迟10s启动频道存活状态监控
+    resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
+    return success()
 
 
 @channels_endpoint.route('/stream/<int:channel_id>', methods = ['GET'])

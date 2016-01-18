@@ -100,6 +100,7 @@
 	- [访问指定频道](#access-channel)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
+	- [恢复推流](#channel-resume)
 	- [对应频道的流状态](#channel-stream-status)
 	- [频道点赞](#channel-like)
 	- [频道取消点赞](#channel-dislike)
@@ -760,7 +761,6 @@ API_CHANNEL_NOT_FOUND
 API_CHANNEL_INACCESSIBLE
 ```
 
-
 <a name="channel-publish"></a>
 ####  开始推流
 **请求**
@@ -822,6 +822,37 @@ API_BAD_REQUEST
 
 - `API_UNAUTHORIZED`： 如果请求的用户和申请结束推流频道的所有者不是同一人，也会返回未授权。
 - `API_BAD_REQUEST`： 频道未处于`publishing`[状态](#channel-status)
+
+<a name="channel-resume"></a>
+####  恢复推流
+**请求**
+
+```
+POST /channels/resume/<int id>
+Authorization: Basic Auth
+```
+
+- `id`： `int`类型，要恢复推流的频道id
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
+
+- `API_UNAUTHORIZED`： 如果请求的用户和申请推流频道的所有者不是同一人，也会返回未授权。
+- `API_BAD_REQUEST`： 频道未处于`published`[状态](#channel-status)，或是频道对应的流已经被其他更新的频道使用了。
 
 <a name="channel-stream-status"></a>
 ####  对应频道的流状态
