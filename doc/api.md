@@ -872,7 +872,7 @@ Authorization: Basic Auth
 {
 	"code": 2000,
 	"desc": "ok",
-	"disable": <bool disable>,
+	"disabled": <bool disable>,
 	"status": <string status>
 }
 ```
