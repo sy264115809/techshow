@@ -72,8 +72,11 @@ def channel_detail(channel_id):
 @login_required
 def channel_disable(channel_id):
     channel = Channel.query.get_or_404(channel_id)
-    channel.disable(destroy_rongcloud_chatroom.s(channel.id))
-    return success()
+    resp = {
+        'disable_calculate_task': channel.disable(),
+        'disable_destroy_chatroom_task': destroy_rongcloud_chatroom.apply_async(args = [channel.id]).id
+    }
+    return success(resp)
 
 
 @admin_endpoint.route('/channels/<int:channel_id>/enable', methods = ['POST'])

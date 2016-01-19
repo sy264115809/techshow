@@ -7,12 +7,12 @@ from datetime import datetime
 from flask import Blueprint, current_app, request, json, url_for, render_template
 from flask_login import login_required, current_user
 
-from .. import db, celery
+from app import db, celery
 from app.models.channel import Channel, ChannelStatus, Complaint
 from app.models.message import Message
 from app.http.request import paginate, Rule, parse_params, parse_int
 from app.http.response import success, MaxChannelTouched, ChannelNotFound, ChannelInaccessible, Unauthorized, \
-    BadRequest, MessageTooFrequently
+    BadRequest
 from app.http.rong_cloud import ApiClient, ClientError
 
 channels_endpoint = Blueprint('channels', __name__, url_prefix = '/channels')
@@ -157,78 +157,13 @@ def publish(channel_id):
     # 如果有当前流上有正在直播的房间, 将其结束
     occupancy = Channel.query.filter_by(stream_id = channel.stream_id, status = ChannelStatus.publishing).first()
     if occupancy:
-        task = occupancy.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
-        resp['terminate_occupancy_task'] = _task_url(task)
+        resp['calculate_occupancy_task'] = occupancy.finish().id
+        resp['destroy_occupancy_chatroom_task'] = destroy_rongcloud_chatroom.apply_async(args = [occupancy.id]).id
 
     # 开始推流, 并在融云中创建一个聊天室
-    task = channel.publish(create_rongcloud_chatroom.s(channel.id, channel.title))
-    resp['create_task'] = _task_url(task)
-    # 延迟10s启动频道存活状态监控
-    resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
-
+    resp['publish_monitor_task'] = channel.publish().id
+    resp['publish_create_chatroom_task'] = create_rongcloud_chatroom.apply_async(args = [channel.id, channel.title]).id
     return success(resp)
-
-
-@celery.task(bind = True)
-def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
-    """向融云服务器发起创建聊天室的请求
-    应通过create_rongcloud_chatroom.delay调用
-    :param self: celery task
-    :param chatroom_id: 创建的聊天室id
-    :param chatroom_name: 创建的聊天室名字
-    """
-    try:
-        ApiClient().chatroom_create({
-            chatroom_id: chatroom_name
-        })
-        return {
-            'action': 'create',
-            'chatroom_id': chatroom_id,
-            'chatroom_name': chatroom_name
-        }
-    except ClientError as exc:
-        logging.warning('Create chatroom[%d] error: [%s].', chatroom_id, exc)
-        # 每隔20s重试一次, 直至成功
-        raise self.retry(exc = exc, countdown = 20, max_retries = None)
-
-
-@celery.task(bind = True, max_retries = None)
-def monitor_channel(self, channel_id):
-    """监视频道所对应的流是否还处于连接或可用状态,
-    防止客户端没有调用finish接口导致已经停止推流的频道还处于直播状态.
-    应通过monitor_channel.delay嗲用
-    :param self: celery task
-    :param channel_id: 监控的频道id
-    """
-    channel = Channel.query.get(channel_id)
-    if channel and channel.is_publishing:
-        if channel.check_stream_alive():
-            raise self.retry(countdown = 10)
-        else:
-            channel.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
-    return {
-        'action': 'monitor done',
-        'channel_id': channel_id,
-    }
-
-
-@celery.task(bind = True)
-def destroy_rongcloud_chatroom(self, chatroom_id):
-    """向融云服务器发起销毁聊天室的请求
-    应通过destroy_rongcloud_chatroom.delay调用
-    :param self: celery task
-    :param chatroom_id: 销毁的聊天室id
-    """
-    try:
-        ApiClient().chatroom_destroy(chatroom_id)
-        return {
-            'action': 'destroy',
-            'chatroom_id': chatroom_id
-        }
-    except ClientError as exc:
-        logging.warning('Destroy chatroom[%d] error: [%s]', chatroom_id, exc)
-        # 每隔30s重试一次, 至多重试5次
-        raise self.retry(exc = exc, countdown = 30, max_retries = 5)
 
 
 @channels_endpoint.route('/finish/<int:channel_id>', methods = ['POST'])
@@ -239,12 +174,14 @@ def finish(channel_id):
     :type channel_id: int
     """
     channel = get_channel(channel_id, must_owner = True)
-    task = channel.finish(callback_task = destroy_rongcloud_chatroom.s(channel.id))
-    if not task:
+    if not channel.is_publishing:
         raise BadRequest('channel is not at publishing status')
-    return success({
-        'finish_task': _task_url(task)
-    })
+
+    resp = {
+        'finish_calculate_task': channel.finish().id,
+        'finish_destroy_chatroom_task': destroy_rongcloud_chatroom.apply_async(args = [channel.id]).id
+    }
+    return success(resp)
 
 
 @channels_endpoint.route('/resume/<int:channel_id>', methods = ['POST'])
@@ -256,20 +193,18 @@ def resume(channel_id):
     :return:
     """
     channel = get_channel(channel_id, must_owner = True)
-    if not channel.is_published:
+    if not (channel.is_published or channel.is_calculating):
         raise BadRequest('cannot resume channel while it is not at the published status')
 
     # 如果当前流上没有比当前频道更新的频道,说明这是一次RESUME操作,重置流的状态为直播中.
     if Channel.query.filter(Channel.stream_id == channel.stream_id, Channel.id > channel.id).count():
         raise BadRequest('cannot resume channel while it is not the newest')
 
-    resp = {}
-    # 开始恢复推流, 并在融云中创建一个聊天室
-    task = channel.resume(create_rongcloud_chatroom.s(channel.id, channel.title))
-    resp['create_task'] = _task_url(task)
-    # 延迟10s启动频道存活状态监控
-    resp['monitor_task'] = _task_url(monitor_channel.apply_async(args = [channel.id], countdown = 10))
-    return success()
+    resp = {
+        'resume_monitor_task': channel.resume().id,
+        'resume_create_chatroom_task': create_rongcloud_chatroom.apply_async(args = [channel.id, channel.title]).id
+    }
+    return success(resp)
 
 
 @channels_endpoint.route('/stream/<int:channel_id>', methods = ['GET'])
@@ -399,41 +334,6 @@ def send_message(channel_id):
     return success()
 
 
-@celery.task(bind = True)
-def send_rongcloud_message(self, user_id, name, avatar, chatroom_id, message, retry = None):
-    """向融云服务器发送聊天室消息.
-    应通过send_rongcloud_message.delay调用
-    :param self: celery task
-    :param user_id: 发送消息的用户id
-    :param name: 发送消息的用户名称
-    :param avatar: 发送消息的用户头像
-    :param chatroom_id: 发往的聊天室id
-    :param message: 发送的消息
-    :param retry: 失败后重试的次数,默认不重试
-    """
-    try:
-        ApiClient().message_chatroom_publish(
-                from_user_id = user_id,
-                to_chatroom_id = chatroom_id,
-                object_name = 'RC:TxtMsg',
-                content = json.dumps({
-                    'content': message,
-                    'extra': {'name': name, 'avatar': avatar}
-                })
-        )
-        return {
-            'action': 'send message',
-            'user_id': user_id,
-            'chatroom_id': chatroom_id,
-            'message': message
-        }
-    except ClientError as exc:
-        logging.warning('User[%d] send message[%s] to chatroom[%d] error: [%s].', user_id, message, chatroom_id, exc)
-        if retry:
-            # 每隔5s重试一次, 至多重试3次
-            raise self.retry(exc = exc, countdown = 5, max_retries = retry)
-
-
 @channels_endpoint.route('/messages/<int:channel_id>', methods = ['GET'])
 @login_required
 def get_channel_messages(channel_id):
@@ -539,6 +439,83 @@ def chatroom_info(channel_id):
 def channel_share(channel_id):
     channel = Channel.query.get_or_404(channel_id)
     return render_template('share.html', channel = channel)
+
+
+@celery.task(bind = True)
+def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
+    """向融云服务器发起创建聊天室的请求
+    应通过create_rongcloud_chatroom.delay调用
+    :param self: celery task
+    :param chatroom_id: 创建的聊天室id
+    :param chatroom_name: 创建的聊天室名字
+    """
+    try:
+        ApiClient().chatroom_create({
+            chatroom_id: chatroom_name
+        })
+        return {
+            'action': 'create',
+            'chatroom_id': chatroom_id,
+            'chatroom_name': chatroom_name
+        }
+    except ClientError as exc:
+        logging.warning('Create chatroom[%d] error: [%s].', chatroom_id, exc)
+        # 每隔20s重试一次, 直至成功
+        raise self.retry(exc = exc, countdown = 20, max_retries = None)
+
+
+@celery.task(bind = True)
+def destroy_rongcloud_chatroom(self, chatroom_id):
+    """向融云服务器发起销毁聊天室的请求
+    应通过destroy_rongcloud_chatroom.delay调用
+    :param self: celery task
+    :param chatroom_id: 销毁的聊天室id
+    """
+    try:
+        ApiClient().chatroom_destroy(chatroom_id)
+        return {
+            'action': 'destroy',
+            'chatroom_id': chatroom_id
+        }
+    except ClientError as exc:
+        logging.warning('Destroy chatroom[%d] error: [%s]', chatroom_id, exc)
+        # 每隔30s重试一次, 至多重试5次
+        raise self.retry(exc = exc, countdown = 30, max_retries = 5)
+
+
+@celery.task(bind = True)
+def send_rongcloud_message(self, user_id, name, avatar, chatroom_id, message, retry = None):
+    """向融云服务器发送聊天室消息.
+    应通过send_rongcloud_message.delay调用
+    :param self: celery task
+    :param user_id: 发送消息的用户id
+    :param name: 发送消息的用户名称
+    :param avatar: 发送消息的用户头像
+    :param chatroom_id: 发往的聊天室id
+    :param message: 发送的消息
+    :param retry: 失败后重试的次数,默认不重试
+    """
+    try:
+        ApiClient().message_chatroom_publish(
+                from_user_id = user_id,
+                to_chatroom_id = chatroom_id,
+                object_name = 'RC:TxtMsg',
+                content = json.dumps({
+                    'content': message,
+                    'extra': {'name': name, 'avatar': avatar}
+                })
+        )
+        return {
+            'action': 'send message',
+            'user_id': user_id,
+            'chatroom_id': chatroom_id,
+            'message': message
+        }
+    except ClientError as exc:
+        logging.warning('User[%d] send message[%s] to chatroom[%d] error: [%s].', user_id, message, chatroom_id, exc)
+        if retry:
+            # 每隔5s重试一次, 至多重试3次
+            raise self.retry(exc = exc, countdown = 5, max_retries = retry)
 
 
 def get_channel(channel_id, access_control = False, must_owner = False):

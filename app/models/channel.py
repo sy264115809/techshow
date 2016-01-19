@@ -1,10 +1,9 @@
 # coding=utf-8
-from random import randint
 from datetime import datetime
 from time import mktime, strftime, localtime
 from flask_login import current_user, current_app
 
-from app import db, cache
+from app import db, cache, celery
 from app.models.user import StreamStatus
 from app.http.rong_cloud import ApiClient, ClientError
 
@@ -17,6 +16,7 @@ class ChannelStatus(object):
     published = 2
     closed = 3
     banned = 4
+    calculating = 5
 
 
 # 点赞关联表
@@ -84,6 +84,10 @@ class Channel(db.Model):
         return self.status == ChannelStatus.banned
 
     @property
+    def is_calculating(self):
+        return self.status == ChannelStatus.calculating
+
+    @property
     def stream(self):
         return self.owner.stream
 
@@ -116,65 +120,48 @@ class Channel(db.Model):
 
         return None
 
-    def publish(self, callback_task = None):
+    def publish(self):
         """设置频道为开始推流状态
-        :param callback_task: 回调的celery subtask
         """
         if self.is_new:
             self.status = ChannelStatus.publishing
             self.started_at = datetime.now()
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
-            if hasattr(callback_task, 'apply_async'):
-                return callback_task.apply_async()
-            return True
+            return monitor_channel.apply_async(args = [self.id], countdown = 10)
         return False
 
-    def resume(self, callback_task = None):
+    def resume(self):
         """恢复频道为开始推流状态
-        :param callback_task: 回调的celery subtask
         """
-        if self.is_published:
+        if self.is_calculating:
             self.status = ChannelStatus.publishing
-            self.stopped_at = None
-            self.duration = None
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
-            if hasattr(callback_task, 'apply_async'):
-                return callback_task.apply_async()
-            return True
+            return monitor_channel.apply_async(args = [self.id], countdown = 10)
         return False
 
-    def finish(self, callback_task = None):
+    def finish(self):
         """设置频道为结束推流状态
-        :param callback_task: 回调的celery subtask
         """
         if self.is_publishing:
-            self.status = ChannelStatus.published
+            self.status = ChannelStatus.calculating
             self.stopped_at = datetime.now()
             self.owner.stream_status = StreamStatus.available
-            self.calc_duration()
-            if self.duration == 0:
-                db.session.delete(self)
-            try:
-                db.session.commit()
-            except:
-                db.session.rollback()
-            if hasattr(callback_task, 'apply_async'):
-                return callback_task.apply_async()
-            return True
+            db.session.commit()
+            return calculate_duration.apply_async(args = [self.id], countdown = 30)
         return False
 
-    def disable(self, callback_task = None):
+    def disable(self):
         """封禁房间.
-        :param callback_task: 回调的celery subtask
         """
         # 掐断直播
         self.owner.disable_stream()
-        self.finish(callback_task)
         self.status = ChannelStatus.banned
+        self.stopped_at = datetime.now()
+        self.owner.stream_status = StreamStatus.unavailable
         db.session.commit()
-        return True
+        return calculate_duration.apply_async(args = [self.id], countdown = 30)
 
     def enable(self):
         """解封房间
@@ -193,23 +180,6 @@ class Channel(db.Model):
             db.session.commit()
             return True
         return False
-
-    def calc_duration(self, force = False):
-        """根据pili stream的segment信息计算真实的持续时间,开始时间和结束时间.
-        默认在duration不为空时不进行计算, 除非参数force被置为True.
-        :param force: 强制计算duration
-        """
-        if self.duration is None or force:
-            start = int(mktime(self.started_at.timetuple()))
-            end = int(mktime(self.stopped_at.timetuple()))
-            segment_info = self.stream.segments(start_second = start, end_second = end)
-
-            self.duration = segment_info['duration']
-
-            segments = segment_info['segments']
-            if segments:
-                self.started_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[-1]['start']))
-                self.stopped_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[0]['end']))
 
     def check_stream_alive(self):
         """检查流是否存活
@@ -263,6 +233,59 @@ class Channel(db.Model):
     @staticmethod
     def assemble_channels(channels):
         return map(lambda c: c.to_json(), channels)
+
+
+@celery.task(bind = True, max_retries = None)
+def monitor_channel(self, channel_id):
+    """监视频道所对应的流是否还处于连接或可用状态,
+    防止客户端没有调用finish接口导致已经停止推流的频道还处于直播状态.
+    应通过monitor_channel.delay嗲用
+    :param self: celery task
+    :param channel_id: 监控的频道id
+    """
+    channel = Channel.query.get(channel_id)
+    if channel and channel.is_publishing:
+        if channel.check_stream_alive():
+            raise self.retry(countdown = 10)
+        else:
+            channel.finish()
+    return {
+        'action': 'monitor done',
+        'channel_id': channel_id,
+    }
+
+
+@celery.task
+def calculate_duration(channel_id):
+    """根据pili stream的segment信息计算真实的持续时间,开始时间和结束时间.
+    默认在duration不为空时不进行计算, 除非参数force被置为True.
+    :param channel_id:要计算duration的频道
+    """
+    channel = Channel.query.with_for_update().get(channel_id)
+    resp = 'do not need calculate'
+    if channel and not channel.is_publishing:
+        start = int(mktime(channel.started_at.timetuple()))
+        end = int(mktime(channel.stopped_at.timetuple()))
+        segment_info = channel.stream.segments(start_second = start, end_second = end)
+        duration = segment_info['duration']
+
+        if duration == 0:
+            db.session.delete(channel)
+            db.session.commit()
+            resp = 'calculate then delete empty channel'
+        else:
+            channel.duration = duration
+            segments = segment_info['segments']
+            channel.started_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[-1]['start']))
+            channel.stopped_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[0]['end']))
+            if not channel.is_banned:
+                channel.status = ChannelStatus.published
+            db.session.commit()
+            resp = 'calculate done'
+    return {
+        'action': resp,
+        'channel_id': channel_id
+    }
 
 
 class Complaint(db.Model):
