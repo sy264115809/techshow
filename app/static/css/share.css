@@ -1,0 +1,198 @@
+.cliptext {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+html {
+    font-size: 62.5%;
+}
+
+html,
+body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: #ddd;
+}
+
+#techshow {
+    max-width: 640px;
+    margin: 0 auto;
+    height: 100%;
+    position: relative;
+}
+
+#techshow .header {
+    height: 5rem;
+    line-height: 5rem;
+    background-color: #fff;
+    position: relative;
+    z-index: 1;
+}
+
+#techshow .header .self-img {
+    display: block;
+    float: left;
+    width: 3.4rem;
+    height: 3.4rem;
+    overflow: hidden;
+    margin-top: 0.8rem;
+    margin-left: 0.8rem;
+    border-radius: 50%;
+}
+
+#techshow .header .self-img img {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 50%;
+
+}
+
+#techshow .header .username {
+    float: left;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: 25%;
+    color: #9a9a9a;
+    font-size: 1.4rem;
+    padding-left: .7rem;
+}
+
+#techshow .header .title {
+    float: right;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin-right: 1rem;
+    color: #9a9a9a;
+    font-size: 1.4rem;
+    width: 48%;
+    text-align: right;
+}
+
+#techshow .footer {
+    height: 5rem;
+    line-height: 5rem;
+    background-color: #1a1f29;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+}
+
+#techshow .footer .logo {
+    display: block;
+    float: left;
+    width: 3.4rem;
+    height: 3.4rem;
+    overflow: hidden;
+    margin-top: 0.8rem;
+    margin-left: 0.8rem;
+}
+
+#techshow .footer .logo img {
+    width: 3.4rem;
+}
+
+#techshow .footer .appname {
+    float: left;
+    width: 25%;
+    color: #ae57fe;
+    font-size: 1.4rem;
+    padding-left: .7rem;
+}
+
+#techshow .footer .otherview {
+    float: right;
+    margin-right: 1rem;
+    background-color: #ae57fe;
+    text-align: center;
+    font-size: 1.4rem;
+    width: 52%;
+    color: #fff;
+    line-height: 3.2rem;
+    border-radius: 1.6rem;
+    margin-top: .9rem;
+}
+
+#techshow .container {
+    box-sizing: border-box;
+    position: absolute;
+    top: 5rem;
+    bottom: 5rem;
+    left: 0;
+    right: 0;
+    background-color: #000;
+}
+
+#techshow .container .show-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    -webkit-transform: translate(-50%, -50%);
+    -ms-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+#techshow .container .cover {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: #000;
+    cursor: pointer;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-family: 'Helvetica Neue', 'Hiragino Sans GB', Arial, "微软雅黑", sans-serif;
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: none;
+}
+
+ul li {
+    list-style: none;
+}
+
+a {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a:hover {
+    text-decoration: none;
+    color: #0093D2;
+    outline: none;
+}
+
+a:focus {
+    text-decoration: none;
+    color: #0093D2;
+    outline: none;
+}
+
+a:active {
+    text-decoration: none;
+    color: #0093D2;
+    outline: none;
+}
+
+.clearfix:before,
+.clearfix:after {
+    content: " ";
+    display: table;
+}
+
+.clearfix:after {
+    clear: both;
+}

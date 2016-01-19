@@ -4,7 +4,7 @@ from random import randint, sample, choice
 from string import ascii_letters, digits
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, json, url_for, render_template
+from flask import Blueprint, current_app, request, json, url_for, render_template, abort
 from flask_login import login_required, current_user
 
 from app import db, celery
@@ -435,9 +435,11 @@ def chatroom_info(channel_id):
     })
 
 
-@channels_endpoint.route('/<int:channel_id>/share', methods = ['GET'])
+@channels_endpoint.route('/share/<int:channel_id>', methods = ['GET'])
 def channel_share(channel_id):
     channel = Channel.query.get_or_404(channel_id)
+    if not (channel.is_publishing or channel.is_published):
+        abort(404)
     return render_template('share.html', channel = channel)
 
 
