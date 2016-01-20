@@ -95,8 +95,9 @@ class Channel(db.Model):
     def online_nums(self):
         if self.is_publishing:
             try:
-                current_app.logger.info('Check Channel[%d] online nums', self.id)
-                return len(ApiClient().chatroom_user_query(self.id)['users'])
+                nums = len(ApiClient().chatroom_user_query(self.id)['users'])
+                current_app.logger.info('Check Channel[%d] online nums: %d', self.id, nums)
+                return nums
             except ClientError as exc:
                 current_app.logger.warning('Refresh channel[%d] online nums error: %s', self.id, exc)
 
@@ -149,7 +150,7 @@ class Channel(db.Model):
             self.stopped_at = datetime.now()
             self.owner.stream_status = StreamStatus.available
             db.session.commit()
-            return calculate_duration.apply_async(args = [self.id], countdown = 30)
+            return calculate_duration.apply_async(args = [self.id], countdown = 60)
         return False
 
     def disable(self):
@@ -161,7 +162,7 @@ class Channel(db.Model):
         self.stopped_at = datetime.now()
         self.owner.stream_status = StreamStatus.unavailable
         db.session.commit()
-        return calculate_duration.apply_async(args = [self.id], countdown = 30)
+        return calculate_duration.apply_async(args = [self.id], countdown = 60)
 
     def enable(self):
         """解封房间
