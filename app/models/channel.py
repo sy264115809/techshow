@@ -134,7 +134,7 @@ class Channel(db.Model):
     def resume(self):
         """恢复频道为开始推流状态
         """
-        if self.is_calculating:
+        if self.is_calculating or self.is_published:
             self.status = ChannelStatus.publishing
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
