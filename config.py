@@ -47,16 +47,15 @@ class Config(object):
 
     TECHSHOW_MAIL_SUBJECT_PREFIX = '[TechShow]'
     TECHSHOW_MAIL_SENDER = 'TechShow Admin <techshow@qiniu.com>'
-    TECHSHOW_ADMIN = os.environ.get('TECHSHOW_ADMIN')
+    TECHSHOW_SUPER_ADMIN = os.environ.get('TECHSHOW_SUPER_ADMIN')
     TECHSHOW_MAX_CHANNELS = 50
     TECHSHOW_SEND_MESSAGE_FREQUENCY = 3
 
-    ADMIN_QINIU = [
+    TECHSHOW_ADMIN = [
         'shaoyu@qiniu.com',
+        '264115809@qq.com',
+        
         'zhonghao@qiniu.com'
-    ]
-    ADMIN_GITHUB = [
-        '264115809@qq.com'
     ]
 
     @classmethod
