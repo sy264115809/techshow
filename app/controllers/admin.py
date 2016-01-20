@@ -20,9 +20,9 @@ def check_admin_authorization():
         if current_user.is_anonymous:
             return redirect(url_for('admin.admin_login'))
 
-        if current_user.github_email in current_app.config['ADMIN_GITHUB']:
+        if current_user.github_email in current_app.config['TECHSHOW_ADMIN']:
             pass
-        elif current_user.qiniu_email in current_app.config['ADMIN_QINIU']:
+        elif current_user.qiniu_email in current_app.config['TECHSHOW_ADMIN']:
             pass
         else:
             return redirect(url_for('admin.admin_login'))
