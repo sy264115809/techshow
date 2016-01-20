@@ -3,6 +3,7 @@ from flask import Flask, render_template
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_cache import Cache
+from flask_mail import Mail
 from celery import Celery
 from pili import Credentials, Hub
 
@@ -13,6 +14,7 @@ from config import config, Config
 db = SQLAlchemy()
 celery = Celery(__name__, broker = Config.CELERY_BROKER_URL)
 cache = Cache()
+mail = Mail()
 pili = Hub(Credentials(Config.PILI_ACCESS_KEY, Config.PILI_SECRET_KEY), Config.PILI_HUB_NAME)
 
 login_manager = LoginManager()
@@ -27,6 +29,7 @@ def create_app(config_name):
 
     db.init_app(app)
     cache.init_app(app)
+    mail.init_app(app)
     celery.conf.update(app.config)
 
     # flask-login init

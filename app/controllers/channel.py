@@ -4,10 +4,11 @@ from random import randint, sample, choice
 from string import ascii_letters, digits
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, json, url_for, render_template, abort
+from flask import Blueprint, current_app, request, json, render_template, abort
 from flask_login import login_required, current_user
+from flask_mail import Message as EMessage
 
-from app import db, celery
+from app import db, celery, mail
 from app.models.channel import Channel, ChannelStatus, Complaint
 from app.models.message import Message
 from app.http.request import paginate, Rule, parse_params, parse_int
@@ -274,7 +275,12 @@ def send_complain(channel_id):
     complain = Complaint(reporter = current_user, channel = channel, **q)
     db.session.add(complain)
     db.session.commit()
-    # TODO:通知管理员
+
+    current_app.logger.info(channel.complaints.count())
+
+    if channel.complaints.count() == 1:
+        send_email('新的频道投诉', 'techshow@qiniu.com', 'mail/new_complaint.html', channel = channel)
+
     return success()
 
 
@@ -328,7 +334,7 @@ def send_message(channel_id):
                                                  channel_id,
                                                  content)
         return success({
-            'send_task': _task_url(send_task)
+            'send_message_task': send_task.id
         })
 
     return success()
@@ -520,6 +526,22 @@ def send_rongcloud_message(self, user_id, name, avatar, chatroom_id, message, re
             raise self.retry(exc = exc, countdown = 5, max_retries = retry)
 
 
+@celery.task
+def send_async_email(msg):
+    mail.send(msg)
+
+
+def send_email(subject, to, template, **kwargs):
+    config = current_app.config
+    msg = EMessage(
+            subject = config['TECHSHOW_MAIL_SUBJECT_PREFIX'] + ' ' + subject,
+            recipients = [to],
+            sender = config['TECHSHOW_MAIL_SENDER']
+    )
+    msg.html = render_template(template, **kwargs)
+    send_async_email.delay(msg)
+
+
 def get_channel(channel_id, access_control = False, must_owner = False):
     channel = Channel.query.get(channel_id)
 
@@ -531,7 +553,3 @@ def get_channel(channel_id, access_control = False, must_owner = False):
         raise Unauthorized()
 
     return channel
-
-
-def _task_url(task):
-    return url_for('channels.task_status', task_id = task.id, _external = True)

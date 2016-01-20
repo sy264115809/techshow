@@ -9,9 +9,10 @@ class Config(object):
     SQLALCHEMY_RECORD_QUERIES = True
     # SQLALCHEMY_ECHO = True
 
-    MAIL_SERVER = 'smtp.googlemail.com'
-    MAIL_PORT = 587
-    MAIL_USE_TLS = True
+    MAIL_SERVER = 'smtp.exmail.qq.com'
+    MAIL_PORT = 465
+    MAIL_USE_SSL = True
+    MAIL_DEBUG = False
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 
@@ -45,20 +46,21 @@ class Config(object):
     QINIU_SECRET_KEY = os.environ.get('QINIU_SECRET_KEY')
 
     TECHSHOW_MAIL_SUBJECT_PREFIX = '[TechShow]'
-    TECHSHOW_MAIL_SENDER = 'TechShow Admin <admin@techshow.com>'
+    TECHSHOW_MAIL_SENDER = 'TechShow Admin <techshow@qiniu.com>'
     TECHSHOW_ADMIN = os.environ.get('TECHSHOW_ADMIN')
     TECHSHOW_MAX_CHANNELS = 50
     TECHSHOW_SEND_MESSAGE_FREQUENCY = 3
 
     ADMIN_QINIU = [
-        'shaoyu@qiniu.com'
+        'shaoyu@qiniu.com',
+        'zhonghao@qiniu.com'
     ]
     ADMIN_GITHUB = [
         '264115809@qq.com'
     ]
 
-    @staticmethod
-    def init_app(app):
+    @classmethod
+    def init_app(cls, app):
         pass
 
 

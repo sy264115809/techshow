@@ -5,6 +5,7 @@ Flask-SQLAlchemy==2.1
 Flask-Migrate==1.5.1
 Flask-Redis==0.1.0
 Flask-Cache==0.13.1
+Flask-Mail==0.9.1
 rauth==0.7.2
 MySQL-python==1.2.5
 Jinja2==2.8
