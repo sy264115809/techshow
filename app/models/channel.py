@@ -128,7 +128,7 @@ class Channel(db.Model):
             self.started_at = datetime.now()
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
-            return monitor_channel.apply_async(args = [self.id], countdown = 10)
+            return monitor_channel.apply_async(args = [self.id], countdown = 30)
         return False
 
     def resume(self):
