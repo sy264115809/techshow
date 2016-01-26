@@ -50,11 +50,12 @@ class Config(object):
     TECHSHOW_SUPER_ADMIN = os.environ.get('TECHSHOW_SUPER_ADMIN')
     TECHSHOW_MAX_CHANNELS = 50
     TECHSHOW_SEND_MESSAGE_FREQUENCY = 3
+    TECHSHOW_SLOW_DB_QUERY_TIME = 0.5
 
     TECHSHOW_ADMIN = [
         'shaoyu@qiniu.com',
         '264115809@qq.com',
-        
+
         'zhonghao@qiniu.com'
     ]
 
@@ -111,10 +112,7 @@ class GunicornConfig(ProductionConfig):
 
         # add handler to redirect to gunicorn error
         import logging
-        from logging import StreamHandler
-        handler = StreamHandler()
-        handler.setLevel(logging.INFO)
-        app.logger.addHandler(handler)
+        app.logger.setLevel(logging.INFO)
         app.logger.handlers.extend(logging.getLogger("gunicorn.error").handlers)
 
 

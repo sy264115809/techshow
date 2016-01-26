@@ -1,7 +1,9 @@
 # coding=utf-8
+import logging
 from datetime import datetime
 from time import mktime, strftime, localtime
 from flask_login import current_user, current_app
+from celery.utils.log import get_task_logger
 
 from app import db, cache, celery
 from app.models.user import StreamStatus
@@ -129,7 +131,9 @@ class Channel(db.Model):
             self.started_at = datetime.now()
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
+            current_app.logger.info('publish channel[%d]', self.id)
             return monitor_channel.apply_async(args = [self.id], countdown = 30)
+        current_app.logger.debug('can not publish channel[%d] with status[%d]', self.id, self.status)
         return False
 
     def resume(self):
@@ -139,7 +143,9 @@ class Channel(db.Model):
             self.status = ChannelStatus.publishing
             self.owner.stream_status = StreamStatus.unavailable
             db.session.commit()
+            current_app.logger.info('resume channel[%d] with status[%d]', self.id, self.status)
             return monitor_channel.apply_async(args = [self.id], countdown = 10)
+        current_app.logger.debug('can not resume channel[%d] with status[%d]', self.id, self.status)
         return False
 
     def finish(self):
@@ -150,7 +156,9 @@ class Channel(db.Model):
             self.stopped_at = datetime.now()
             self.owner.stream_status = StreamStatus.available
             db.session.commit()
+            current_app.logger.info('finish channel[%d]', self.id)
             return calculate_duration.apply_async(args = [self.id], countdown = 60)
+        current_app.logger.debug('can not finish channel[%d] with status[%d]', self.id, self.status)
         return False
 
     def disable(self):
@@ -162,6 +170,7 @@ class Channel(db.Model):
         self.stopped_at = datetime.now()
         self.owner.stream_status = StreamStatus.unavailable
         db.session.commit()
+        current_app.logger.info('disable channel[%d]', self.id)
         return calculate_duration.apply_async(args = [self.id], countdown = 60)
 
     def enable(self):
@@ -170,7 +179,9 @@ class Channel(db.Model):
         if self.is_banned:
             self.status = ChannelStatus.published
             db.session.commit()
+            current_app.logger.info('enable channel[%d]', self.id)
             return True
+        current_app.logger.debug('can not enable channel[%d] with status[%d]', self.id, self.status)
         return False
 
     def close(self):
@@ -179,7 +190,9 @@ class Channel(db.Model):
         if self.is_published:
             self.status = ChannelStatus.closed
             db.session.commit()
+            current_app.logger.info('close channel[%d]', self.id)
             return True
+        current_app.logger.debug('can not close channel[%d] with status[%d]', self.id, self.status)
         return False
 
     def check_stream_alive(self):
@@ -236,6 +249,9 @@ class Channel(db.Model):
         return map(lambda c: c.to_json(), channels)
 
 
+logger = get_task_logger(__name__)
+
+
 @celery.task(bind = True, max_retries = None)
 def monitor_channel(self, channel_id):
     """监视频道所对应的流是否还处于连接或可用状态,
@@ -245,13 +261,17 @@ def monitor_channel(self, channel_id):
     :param channel_id: 监控的频道id
     """
     channel = Channel.query.get(channel_id)
+    resp = 'channel dose not need monitor'
     if channel and channel.is_publishing:
+        logger.debug('monitor channel[%d]', channel.id)
         if channel.check_stream_alive():
+            logger.debug('channel %d is alive, retry later', channel.id)
             raise self.retry(countdown = 10)
         else:
+            resp = 'finish channel, monitor done'
             channel.finish()
     return {
-        'action': 'monitor done',
+        'action': resp,
         'channel_id': channel_id,
     }
 
@@ -263,7 +283,7 @@ def calculate_duration(channel_id):
     :param channel_id:要计算duration的频道
     """
     channel = Channel.query.with_for_update().get(channel_id)
-    resp = 'do not need calculate'
+    resp = 'channel does not need calculate'
     if channel and not channel.is_publishing:
         start = int(mktime(channel.started_at.timetuple()))
         end = int(mktime(channel.stopped_at.timetuple()))
