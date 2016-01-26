@@ -2,7 +2,7 @@
 import random
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort
+from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort, json
 from flask_login import login_required, current_user, login_user
 from flask_sqlalchemy import get_debug_queries
 
@@ -252,6 +252,23 @@ def log_slow_query(response):
                     % (query.statement, query.parameters, query.duration,
                        query.context))
     return response
+
+
+@users_endpoint.after_app_request
+def log_business_code(response):
+    if response.content_type == 'application/json':
+        content = json.loads(response.data)
+        if content.get('code'):
+            current_app.logger.info(
+                    'Request[%s %s "referrer:%s" "ua:%s"] response with code[%s]',
+                    request.method,
+                    request.path,
+                    request.referrer or '-',
+                    request.user_agent or '-',
+                    content.get('code')
+            )
+    return response
+
 
 @login_manager.request_loader
 def load_user_from_request(request):
