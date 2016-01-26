@@ -4,6 +4,7 @@ from datetime import datetime
 
 from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort
 from flask_login import login_required, current_user, login_user
+from flask_sqlalchemy import get_debug_queries
 
 from app import db, login_manager
 from app.models.user import User, UserGender
@@ -241,6 +242,16 @@ def update_user_info():
         'user': current_user.to_json()
     })
 
+
+@users_endpoint.after_app_request
+def log_slow_query(response):
+    for query in get_debug_queries():
+        if query.duration >= current_app.config['TECHSHOW_SLOW_DB_QUERY_TIME']:
+            current_app.logger.warning(
+                    'Slow query: %s\nParameters: %s\nDuration: %fs\nContext: %s\n'
+                    % (query.statement, query.parameters, query.duration,
+                       query.context))
+    return response
 
 @login_manager.request_loader
 def load_user_from_request(request):
