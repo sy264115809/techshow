@@ -26,8 +26,9 @@ reload = False
 debug = False
 
 bind = "%s:%s" % ("127.0.0.1", 8000)
-pidfile = '%s/run/%s.pid' % (path_of_current_dir, _file_name)
+pidfile = '/var/run/techshow.pid'
+# pidfile = '%s/run/%s.pid' % (path_of_current_dir, _file_name)
 # errorlog = '%s/logs/%s_error.log' % (path_of_current_dir, _file_name)
 # accesslog = '%s/logs/%s_access.log' % (path_of_current_dir, _file_name)
 accesslog = '-'
-access_log_format = "%(p)s %(h)s %(l)s %(u)s %(t)s “%(r)s” %(s)s %(b)s “referer:%(f)s” “ua:%(a)s” elapse:%(D)sμs"
+access_log_format = "%(p)s %(h)s %(l)s %(u)s %(t)s “%(r)s” %(s)s %(b)s “referrer:%(f)s” “ua:%(a)s” elapse:%(D)sμs"
