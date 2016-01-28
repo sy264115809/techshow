@@ -2,8 +2,9 @@
 import random
 from datetime import datetime
 
-from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort
+from flask import Blueprint, current_app, request, url_for, redirect, render_template, abort, json
 from flask_login import login_required, current_user, login_user
+from flask_sqlalchemy import get_debug_queries
 
 from app import db, login_manager
 from app.models.user import User, UserGender
@@ -240,6 +241,33 @@ def update_user_info():
     return success({
         'user': current_user.to_json()
     })
+
+
+@users_endpoint.after_app_request
+def log_slow_query(response):
+    for query in get_debug_queries():
+        if query.duration >= current_app.config['TECHSHOW_SLOW_DB_QUERY_TIME']:
+            current_app.logger.warning(
+                    'Slow query: %s\nParameters: %s\nDuration: %fs\nContext: %s\n'
+                    % (query.statement, query.parameters, query.duration,
+                       query.context))
+    return response
+
+
+@users_endpoint.after_app_request
+def log_business_code(response):
+    if response.content_type == 'application/json':
+        content = json.loads(response.data)
+        if content.get('code'):
+            current_app.logger.info(
+                    'Request[%s %s "referrer:%s" "ua:%s"] response with code[%s]',
+                    request.method,
+                    request.path,
+                    request.referrer or '-',
+                    request.user_agent or '-',
+                    content.get('code')
+            )
+    return response
 
 
 @login_manager.request_loader

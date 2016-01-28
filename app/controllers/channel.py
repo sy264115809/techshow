@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Blueprint, current_app, request, json, render_template, abort
 from flask_login import login_required, current_user
 from flask_mail import Message as EMessage
+from celery.utils.log import get_task_logger
 
 from app import db, celery, mail
 from app.models.channel import Channel, ChannelStatus, Complaint
@@ -278,8 +279,10 @@ def send_complain(channel_id):
 
     current_app.logger.info(channel.complaints.count())
 
+    # send email to admin
     if channel.complaints.count() == 1:
         send_email('新的频道投诉', 'techshow@qiniu.com', 'mail/new_complaint.html', channel = channel)
+        current_app.logger.info('send complaint[id:%d, content:%s] email to admin.', complain.id, complain.reason)
 
     return success()
 
@@ -449,6 +452,9 @@ def channel_share(channel_id):
     return render_template('share.html', channel = channel)
 
 
+logger = get_task_logger(__name__)
+
+
 @celery.task(bind = True)
 def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
     """向融云服务器发起创建聊天室的请求
@@ -462,7 +468,7 @@ def create_rongcloud_chatroom(self, chatroom_id, chatroom_name):
             chatroom_id: chatroom_name
         })
         return {
-            'action': 'create',
+            'action': 'create chatroom',
             'chatroom_id': chatroom_id,
             'chatroom_name': chatroom_name
         }
@@ -482,7 +488,7 @@ def destroy_rongcloud_chatroom(self, chatroom_id):
     try:
         ApiClient().chatroom_destroy(chatroom_id)
         return {
-            'action': 'destroy',
+            'action': 'destroy chatroom',
             'chatroom_id': chatroom_id
         }
     except ClientError as exc:
@@ -529,6 +535,9 @@ def send_rongcloud_message(self, user_id, name, avatar, chatroom_id, message, re
 @celery.task
 def send_async_email(msg):
     mail.send(msg)
+    return {
+        'action': 'send emails'
+    }
 
 
 def send_email(subject, to, template, **kwargs):
