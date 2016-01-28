@@ -4140,9 +4140,9 @@ body.modal-open {
   padding: 20px;
   margin-bottom: 20px;
 }
-.contact-box a {
-  color: inherit;
-}
+/*.contact-box a {*/
+  /*color: inherit;*/
+/*}*/
 /* INVOICE */
 .invoice-table tbody > tr > td:last-child,
 .invoice-table tbody > tr > td:nth-child(4),

@@ -67,6 +67,7 @@
 |`API_UNAUTHORIZED`|4010|unauthorized|未授权，一般是因为`api_token`不正确|
 |`API_INVALID_AUTH_CODE`|4011|invalid auth code|错误的登录验证码|
 |`API_OAUTH_FAIL`|4012|oauth fail|OAuth登录失败|
+|`API_USER_BANNED`|4013|user is banned|用户被禁用|
 |`API_MAX_CHANNEL_TOUCHED`|4031|touch maximum number of channels|达到最大频道数量|
 |`API_MESSAGE_TOO_FREQUENTLY`|4032|send meesage too frequently|发送消息频率太快|
 |`API_CHANNEL_INACCESSIBLE`|4033|channel is inaccessible|频道不处于`推流中`或`结束推流`的[状态](#channel-status)，不可访问|
@@ -100,6 +101,7 @@
 	- [访问指定频道](#access-channel)
 	- [开始推流](#channel-publish)
 	- [结束推流](#channel-finish)
+	- [恢复推流](#channel-resume)
 	- [对应频道的流状态](#channel-stream-status)
 	- [频道点赞](#channel-like)
 	- [频道取消点赞](#channel-dislike)
@@ -760,7 +762,6 @@ API_CHANNEL_NOT_FOUND
 API_CHANNEL_INACCESSIBLE
 ```
 
-
 <a name="channel-publish"></a>
 ####  开始推流
 **请求**
@@ -823,12 +824,43 @@ API_BAD_REQUEST
 - `API_UNAUTHORIZED`： 如果请求的用户和申请结束推流频道的所有者不是同一人，也会返回未授权。
 - `API_BAD_REQUEST`： 频道未处于`publishing`[状态](#channel-status)
 
+<a name="channel-resume"></a>
+####  恢复推流
+**请求**
+
+```
+POST /channels/resume/<int id>
+Authorization: Basic Auth
+```
+
+- `id`： `int`类型，要恢复推流的频道id
+
+**成功**
+
+```
+{
+	"code": 2000,
+	"desc": "ok",
+}
+```
+
+**失败**
+
+```
+API_UNAUTHORIZED
+API_CHANNEL_NOT_FOUND
+API_BAD_REQUEST
+```
+
+- `API_UNAUTHORIZED`： 如果请求的用户和申请推流频道的所有者不是同一人，也会返回未授权。
+- `API_BAD_REQUEST`： 频道未处于`published`[状态](#channel-status)，或是频道对应的流已经被其他更新的频道使用了。
+
 <a name="channel-stream-status"></a>
 ####  对应频道的流状态
 **请求**
 
 ```
-POST /channels/stream/<int id>
+GET /channels/stream/<int id>
 Authorization: Basic Auth
 ```
 
@@ -840,7 +872,7 @@ Authorization: Basic Auth
 {
 	"code": 2000,
 	"desc": "ok",
-	"disable": <bool disable>,
+	"disabled": <bool disable>,
 	"status": <string status>
 }
 ```
@@ -1050,13 +1082,13 @@ Authorization: Basic Auth
 ```
 
 - `id`： `int`类型，要发送消息的频道id
-- `s`： `int`类型，相对频道开始直播时间的偏移，即要获得的消息列表在时间轴上的起始点，默认为`0`，单位秒
-- `o`： `int`类型，相对于`s`参数的偏移，默认为`10`，单位秒
-- `l`： `int`类型，要获取的消息条目限制，默认为`不限制`
+- `s`： `int`类型，要获取对应视频第`s`秒的字幕，默认为`1`，单位秒
+- `o`： `int`类型，要获取包括第`s`秒在内，往后`o`秒的字幕，默认为`10`，单位秒
+- `l`： `int`类型，每秒最大的字幕数目，默认为`不限制`
 
-> 关于参数`o`和`s`的解释
+> 参数解释
 > 
-> 假设`o`=3，`s`=15，则它们组合起来的含义是：获取从相对于视频开始直播时间第3秒开始到第18(3+15)秒的消息
+> 假设`s`=31，`o`=30，l=`5`，则它们组合起来的含义是：要获取对应视频第31(s)秒开始的总共30(o)秒的字幕列表(即31-60秒的字幕)，每秒最多只返回最新的5个(l)。
 
 **成功**
 
@@ -1064,8 +1096,25 @@ Authorization: Basic Auth
 {
 	"code": 2000,
 	"desc": "ok",
+	"count": <int count>,
+	"messages": {
+	    '<int offset1>': [
+	    	<message>,
+	    	<message>,
+	    	...
+	    ]
+	},
+	"start": <int start>,
+	"offset": <int offset>,
+	"limit": <int limit>
 }
 ```
+
+- `count`： `int`类型，查询返回的消息数量
+- `messages`： `Map`类型，查询返回的所有消息列表，对于其中的每一个键值对，**`key`是`offset`，`value`为对应该`offset`的所有消息列表。消息列表的类型是`Array`，其中每一个元素都为[消息类型](#message-definition)。
+- `start`： `int`类型，对应请求的`s`参数，即本次请求的上下文，方便调试
+- `offset`： `int`类型，对应请求的`o`参数，即本次请求的上下文，方便调试
+- `limit`： `int`类型，对应请求的`l`参数，即本次请求的上下文，方便调试
 
 **失败**
 
@@ -1074,5 +1123,4 @@ API_UNAUTHORIZED
 API_CHANNEL_NOT_FOUND
 API_BAD_REQUEST
 API_CHANNEL_INACCESSIBLE
-API_MESSAGE_TOO_FREQUENTLY
 ```

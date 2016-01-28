@@ -1,42 +1,40 @@
 # coding=utf8
-import logging
-import os
-
-from flask import Flask
+from flask import Flask, render_template
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_cache import Cache
+from flask_mail import Mail
+from celery import Celery
+from pili import Credentials, Hub
 
 from app.http.response import APIException, Unauthorized
 from app.http.response import exception
-from app.http.rong_cloud import ApiClient
+from config import config, Config
 
 db = SQLAlchemy()
+celery = Celery(__name__, broker = Config.CELERY_BROKER_URL)
+cache = Cache()
+mail = Mail()
+pili = Hub(Credentials(Config.PILI_ACCESS_KEY, Config.PILI_SECRET_KEY), Config.PILI_HUB_NAME)
+
 login_manager = LoginManager()
+login_manager.session_protection = 'strong'
 
 
-def create_app(config):
+def create_app(config_name):
     app = Flask(__name__)
 
-    app.config.from_object(config)
-    app.debug = app.config['DEBUG']
-    app.secret_key = app.config['SECRET_KEY']
-
-    # add handler to redirect to gunicorn error
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
-    app.logger.addHandler(handler)
-    app.logger.handlers.extend(logging.getLogger("gunicorn.error").handlers)
-    app.logger.info('Use %s', config.__name__)
+    app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
 
     db.init_app(app)
+    cache.init_app(app)
+    mail.init_app(app)
+    celery.conf.update(app.config)
 
     # flask-login init
     login_manager.init_app(app)
     login_manager.unauthorized_handler(lambda: exception(Unauthorized()))
-
-    # rongcloud init
-    os.environ.setdefault('rongcloud_app_key', app.config['RONG_CLOUD_APP_KEY'])
-    os.environ.setdefault('rongcloud_app_secret', app.config['RONG_CLOUD_APP_SECRET'])
 
     # blueprint
     from app.controllers.user import users_endpoint
@@ -48,5 +46,8 @@ def create_app(config):
 
     # error handler
     app.register_error_handler(APIException, lambda e: exception(e))
+
+    app.register_error_handler(404, lambda e: render_template('404.html'))
+    app.register_error_handler(500, lambda e: render_template('500.html'))
 
     return app

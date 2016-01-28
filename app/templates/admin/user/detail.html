@@ -1,0 +1,86 @@
+{% extends 'admin/user/index.html' %}
+{% import 'admin/channel/helper.html' as channel_helper %}
+
+{% block heading_text %}{{ user.nickname }}{% endblock %}
+
+{% block breadcrumb %}
+    {{ super() }}
+    <li>
+        <a>详情</a>
+    </li>
+{% endblock %}
+
+{% block js %}
+    {{ js_file('js/admin/user.js') }}
+    {{ js_file('js/admin/channel.js') }}
+{% endblock %}
+
+{% block content %}
+    <div class="row animated fadeInRight">
+        <div class="col-lg-4">
+            <div class="contact-box">
+                <div class="col-sm-4 text-center">
+                    <img alt="image" class="img-circle img-responsive" src="{{ user.avatar }}">
+                    <div class="m-t-sm h3">{{ user.nickname }}</div>
+                    <div class="m-t-sm">
+                        {{ helper.banOp(user,True) }}
+                        {{ helper.streamOp(user,True) }}
+                    </div>
+                </div>
+                <div class="col-sm-8">
+                    <h4><strong></strong></h4>
+                    <table class="table table-responsive">
+                        <tbody>
+                        <tr>
+                            <td>姓名</td>
+                            <td>{{ user.name if user.name else '未提供' }}</td>
+                        </tr>
+                        <tr>
+                            <td>性别</td>
+                            <td>
+                                {% if user.gender==None %}未提供
+                                {% elif user.gender==0 %}男
+                                {% elif user.gender==1 %}女
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>创建时间</td>
+                            <td>{{ user.created_at }}</td>
+                        </tr>
+                        <tr>
+                            <td>最近一次登录</td>
+                            <td>{{ user.current_sign_in_at }}</td>
+                        </tr>
+                        <tr>
+                            <td>登录次数</td>
+                            <td>{{ user.sign_in_count }}</td>
+                        </tr>
+                        <tr>
+                            <td>用户状态</td>
+                            <td>{{ helper.status(user) }}</td>
+                        </tr>
+                        <tr>
+                            <td>流状态</td>
+                            <td>{{ helper.streamStatus(user) }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+                <div class="clearfix"></div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="ibox">
+                <div class="ibox-title">
+                    <h4>{{ user.nickname }}的频道列表</h4>
+                </div>
+                <div class="ibox-content">
+                    {{ channel_helper.channels_table(channels,'admin.user_detail', user_id=user.id, owner_id=user.id) }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

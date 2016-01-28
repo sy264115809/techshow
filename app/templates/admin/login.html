@@ -9,10 +9,10 @@
         <div>
             <h3>欢迎来到TechShow控制台</h3>
             <p>选择以下两种方式中的一种登录</p>
-            <a href="{{ url_for('users.login_by_qiniu') }}">
+            <a href="{{ url_for('users.login_by_oauth',provider_name='qiniu') }}">
                 <button type="button" class="btn btn-success block full-width m-b">七牛帐号</button>
             </a>
-            <a href="{{ url_for('users.login_by_github') }}">
+            <a href="{{ url_for('users.login_by_oauth',provider_name='github') }}">
                 <button type="button" class="btn btn-white block full-width m-b">Github帐号</button>
             </a>
             <p class="m-t">

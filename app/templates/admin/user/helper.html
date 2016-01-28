@@ -1,0 +1,61 @@
+{% macro status(user) %}
+    {# 用户状态 #}
+    {% if user.is_banned %}
+        <span class="label label-danger"><i class="fa fa-ban"></i>用户:封禁</span>
+    {% else %}
+        <span class="label label-primary"><i class="fa fa-check"></i>用户:正常</span>
+    {% endif %}
+
+
+{% endmacro %}
+
+{% macro streamStatus(user) %}
+    {# 流状态 #}
+    {% if user.is_stream_enabled %}
+        <span class="label label-primary"><i class="fa fa-check"></i>流:可用</span>
+    {% else %}
+        <span class="label label-danger"><i class="fa fa-times"></i>流:不可用</span>
+    {% endif %}
+{% endmacro %}
+
+{% macro banOp(user, btnBlock=False) %}
+    {# 用户封禁操作 #}
+    {% if user.is_banned %}
+        <button class="btn btn-xs btn-primary btn-rounded {{ 'btn-block' if btnBlock }} user-unban" type="button"
+                data-user-name="{{ user.nickname }}"
+                data-user-id={{ user.id }}
+        >
+            <i class="fa fa-unlock"></i>
+            <span class="bold">解禁用户</span>
+        </button>
+    {% else %}
+        <button class="btn btn-xs btn-danger btn-rounded {{ 'btn-block' if btnBlock }} user-ban" type="button"
+                data-user-name="{{ user.nickname }}"
+                data-user-id={{ user.id }}
+        >
+            <i class="fa fa-ban"></i>
+            <span class="bold">封禁用户</span>
+        </button>
+    {% endif %}
+{% endmacro %}
+
+{% macro streamOp(user, btnBlock=False) %}
+    {# 流开关操作 #}
+    {% if user.is_stream_enabled %}
+        <button class="btn btn-xs btn-danger btn-rounded {{ 'btn-block' if btnBlock }} stream-disable" type="button"
+                data-user-name="{{ user.nickname }}"
+                data-user-id={{ user.id }}
+        >
+            <i class="fa fa-ban"></i>
+            <span class="bold">关闭流</span>
+        </button>
+    {% else %}
+        <button class="btn btn-xs btn-primary btn-rounded {{ 'btn-block' if btnBlock }} stream-enable" type="button"
+                data-user-name="{{ user.nickname }}"
+                data-user-id={{ user.id }}
+        >
+            <i class="fa fa-unlock"></i>
+            <span class="bold">启用流</span>
+        </button>
+    {% endif %}
+{% endmacro %}

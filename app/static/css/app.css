@@ -1,0 +1,38 @@
+body {
+    background-color: #272F3E;
+}
+
+.middle-container {
+    height: 200px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    margin: auto;
+    text-align: center;
+}
+
+.middle-container .bulletin {
+    font-size: 120px;
+}
+
+.middle-container .bulletin img {
+    width: 64px;
+}
+.middle-container .oauth-area .oauth-text {
+    margin-top: 60px;
+}
+
+.middle-container .oauth-area .oauth-left {
+    width: 64px;
+}
+
+.middle-container .oauth-area .oauth-line {
+    width: 120px;
+    margin: 0 24px;
+}
+
+.middle-container .oauth-area .oauth-right {
+    width: 64px;
+}

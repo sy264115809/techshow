@@ -4,12 +4,13 @@ from flask import request
 from app.http.response import BadRequest
 
 
-def paginate():
+def paginate(default_limit = 10):
     """返回适合sqlalchemy.paginate的参数
+    :param default_limit:默认的每页项数
     page - 页数, 从1开始, 默认1
     limit - 每页项数, 必须大于0, 默认10
     """
-    limit = parse_int('l', default = 10, condition = lambda l: l > 0)
+    limit = parse_int('l', default = default_limit, condition = lambda l: l > 0)
     page = parse_int('p', default = 1, condition = lambda p: p >= 1)
     return page, limit
 

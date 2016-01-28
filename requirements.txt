@@ -3,12 +3,17 @@ Flask-Login==0.3.2
 Flask-Script==2.0.5
 Flask-SQLAlchemy==2.1
 Flask-Migrate==1.5.1
+Flask-Redis==0.1.0
+Flask-Cache==0.13.1
+Flask-Mail==0.9.1
 rauth==0.7.2
 MySQL-python==1.2.5
 Jinja2==2.8
 pili==1.5.4
 requests>=2.1.0
 gunicorn==19.4.1
+celery[redis]==3.1.19
+qiniu==7.0.6
 
 # Flask-SocketIO==1.2
 # gevent==1.1b5

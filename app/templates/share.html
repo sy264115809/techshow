@@ -1,0 +1,62 @@
+{% from "admin/base/html_utils.html" import css_file, js_file %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"/>
+    <title>{{ channel.owner.nickname + '的频道' }}</title>
+
+    {{ css_file('css/plugins/mediaelement/mediaelementplayer.min.css') }}
+    {{ css_file('css/share.css') }}
+
+    {{ js_file("js/jquery-2.1.1.js") }}
+    {{ js_file('js/plugins/mediaelement/mediaelement-and-player.min.js') }}
+</head>
+<body>
+<div id="techshow">
+    <div class="header">
+        <a class="self-img" href="#"><img src="{{ channel.owner.avatar }}"></a>
+        <div class="username">{{ channel.owner.nickname }}</div>
+        <div class="title">{{ channel.title }}</div>
+    </div>
+    <div class="container">
+        <div class="show-video">
+            <div class="video-container">
+                <video id='video' width="1000" height="500">
+                    {% if channel.is_publishing %}
+                        <source type="application/x-mpegURL" src="{{ channel.live_urls()['hls'] }}"/>
+                    {% elif channel.is_published %}
+                        <source type="application/x-mpegURL" src="{{ channel.playback_url()['hls'] }}"/>
+                    {% endif %}
+                </video>
+            </div>
+        </div>
+        <div class="cover"></div>
+    </div>
+    <div class="footer">
+        <a href="#" class="logo"><img src="/static/images/logo_techshow.png"></a>
+        <div class="appname">TechShow</div>
+        <a class="otherview">还想看她的其他直播</a>
+    </div>
+</div>
+<script>
+    $(function () {
+        var wid = $("#techshow").width();
+        $("#video").attr({
+            'width': wid,
+            'height': Math.floor(wid * 1.78)
+        });
+        var video = new MediaElementPlayer("#video", {
+            alwaysShowControls: false,
+            enableAutosize: false
+        });
+        $('.cover').click(function () {
+            video.play();
+            $('.mejs-overlay-play').hide();
+            $(this).remove();
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,8 +1,11 @@
 # coding=utf-8
 from datetime import datetime
-from time import mktime
+from time import mktime, strftime, localtime
+from flask_login import current_user, current_app
 
-from app import db
+from app import db, cache, celery
+from app.models.user import StreamStatus
+from app.http.rong_cloud import ApiClient, ClientError
 
 
 class ChannelStatus(object):
@@ -13,6 +16,7 @@ class ChannelStatus(object):
     published = 2
     closed = 3
     banned = 4
+    calculating = 5
 
 
 # 点赞关联表
@@ -43,7 +47,6 @@ class Channel(db.Model):
 
     started_at = db.Column(db.DateTime)
     stopped_at = db.Column(db.DateTime)
-
     created_at = db.Column(db.DateTime, default = datetime.now)
 
     liked_users = db.relationship('User',
@@ -51,11 +54,14 @@ class Channel(db.Model):
                                   backref = db.backref('like_channels', lazy = 'dynamic'),
                                   lazy = 'dynamic')
 
-    def __init__(self, title, owner, **kwargs):
-        self.title = title
-        self.owner = owner
-        self.stream_id = owner.stream_id
+    def __init__(self, **kwargs):
+        self.owner = current_user
+        self.stream_id = current_user.stream_id
+        self.thumbnail = Thumbnail.random_url()
         super(Channel, self).__init__(**kwargs)
+
+    def __repr__(self):
+        return '<Channel %r>' % self.id
 
     @property
     def is_new(self):
@@ -77,6 +83,115 @@ class Channel(db.Model):
     def is_banned(self):
         return self.status == ChannelStatus.banned
 
+    @property
+    def is_calculating(self):
+        return self.status == ChannelStatus.calculating
+
+    @property
+    def stream(self):
+        return self.owner.stream
+
+    @cache.memoize(timeout = 10)
+    def online_nums(self):
+        if self.is_publishing:
+            try:
+                nums = len(ApiClient().chatroom_user_query(self.id)['users'])
+                current_app.logger.info('Check Channel[%d] online nums: %d', self.id, nums)
+                return nums
+            except ClientError as exc:
+                current_app.logger.warning('Refresh channel[%d] online nums error: %s', self.id, exc)
+
+    def live_urls(self):
+        if self.is_publishing:
+            return {
+                'rtmp': self.stream.rtmp_live_urls()['ORIGIN'],
+                'hls': self.stream.hls_live_urls()['ORIGIN'],
+                'flv': self.stream.http_flv_live_urls()['ORIGIN']
+            }
+
+        return None
+
+    def playback_url(self):
+        if self.is_published:
+            start = mktime(self.started_at.timetuple())
+            end = mktime(self.stopped_at.timetuple())
+            return {
+                'hls': self.stream.hls_playback_urls(start_second = start, end_second = end)['ORIGIN']
+            }
+
+        return None
+
+    def publish(self):
+        """设置频道为开始推流状态
+        """
+        if self.is_new:
+            self.status = ChannelStatus.publishing
+            self.started_at = datetime.now()
+            self.owner.stream_status = StreamStatus.unavailable
+            db.session.commit()
+            return monitor_channel.apply_async(args = [self.id], countdown = 30)
+        return False
+
+    def resume(self):
+        """恢复频道为开始推流状态
+        """
+        if self.is_calculating or self.is_published:
+            self.status = ChannelStatus.publishing
+            self.owner.stream_status = StreamStatus.unavailable
+            db.session.commit()
+            return monitor_channel.apply_async(args = [self.id], countdown = 10)
+        return False
+
+    def finish(self):
+        """设置频道为结束推流状态
+        """
+        if self.is_publishing:
+            self.status = ChannelStatus.calculating
+            self.stopped_at = datetime.now()
+            self.owner.stream_status = StreamStatus.available
+            db.session.commit()
+            return calculate_duration.apply_async(args = [self.id], countdown = 60)
+        return False
+
+    def disable(self):
+        """封禁房间.
+        """
+        # 掐断直播
+        self.owner.disable_stream()
+        self.status = ChannelStatus.banned
+        self.stopped_at = datetime.now()
+        self.owner.stream_status = StreamStatus.unavailable
+        db.session.commit()
+        return calculate_duration.apply_async(args = [self.id], countdown = 60)
+
+    def enable(self):
+        """解封房间
+        """
+        if self.is_banned:
+            self.status = ChannelStatus.published
+            db.session.commit()
+            return True
+        return False
+
+    def close(self):
+        """关闭房间
+        """
+        if self.is_published:
+            self.status = ChannelStatus.closed
+            db.session.commit()
+            return True
+        return False
+
+    def check_stream_alive(self):
+        """检查流是否存活
+        """
+        if not self.is_publishing:
+            return False
+        elif self.stream.disabled or self.stream.status()['status'] == 'disconnected':
+            return False
+        else:
+            return True
+
     def like(self, user):
         if not self.is_like(user):
             self.liked_users.append(user)
@@ -91,7 +206,7 @@ class Channel(db.Model):
         return self.liked_users.filter(channel_user_like.c.user_id == user.id).count() > 0
 
     def to_json(self):
-        return {
+        base_info = {
             'id': self.id,
             'title': self.title,
             'thumbnail': self.thumbnail,
@@ -107,16 +222,111 @@ class Channel(db.Model):
             'stopped_at': mktime(self.stopped_at.timetuple()) if self.stopped_at else None,
             'created_at': mktime(self.created_at.timetuple()),
         }
+        return {
+            'channel': base_info,
+            'is_liked': self.is_like(current_user),
+            'live': self.live_urls(),
+            'playback': self.playback_url(),
+            'live_time': (datetime.now() - self.started_at).seconds if self.is_publishing else None,
+            'online_nums': self.online_nums()
+        }
+
+    @staticmethod
+    def assemble_channels(channels):
+        return map(lambda c: c.to_json(), channels)
+
+
+@celery.task(bind = True, max_retries = None)
+def monitor_channel(self, channel_id):
+    """监视频道所对应的流是否还处于连接或可用状态,
+    防止客户端没有调用finish接口导致已经停止推流的频道还处于直播状态.
+    应通过monitor_channel.delay嗲用
+    :param self: celery task
+    :param channel_id: 监控的频道id
+    """
+    channel = Channel.query.get(channel_id)
+    if channel and channel.is_publishing:
+        if channel.check_stream_alive():
+            raise self.retry(countdown = 10)
+        else:
+            channel.finish()
+    return {
+        'action': 'monitor done',
+        'channel_id': channel_id,
+    }
+
+
+@celery.task
+def calculate_duration(channel_id):
+    """根据pili stream的segment信息计算真实的持续时间,开始时间和结束时间.
+    默认在duration不为空时不进行计算, 除非参数force被置为True.
+    :param channel_id:要计算duration的频道
+    """
+    channel = Channel.query.with_for_update().get(channel_id)
+    resp = 'do not need calculate'
+    if channel and not channel.is_publishing:
+        start = int(mktime(channel.started_at.timetuple()))
+        end = int(mktime(channel.stopped_at.timetuple()))
+        segment_info = channel.stream.segments(start_second = start, end_second = end)
+        duration = segment_info['duration']
+
+        if duration == 0:
+            db.session.delete(channel)
+            db.session.commit()
+            resp = 'calculate then delete empty channel'
+        else:
+            channel.duration = duration
+            segments = segment_info['segments']
+            channel.started_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[-1]['start']))
+            channel.stopped_at = strftime('%Y-%m-%d %H:%M:%S', localtime(segments[0]['end']))
+            if not channel.is_banned:
+                channel.status = ChannelStatus.published
+            db.session.commit()
+            resp = 'calculate done'
+    return {
+        'action': resp,
+        'channel_id': channel_id
+    }
 
 
 class Complaint(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    reporter = db.relationship('User', backref = db.backref('complaints', lazy = 'dynamic'))
+    reporter = db.relationship('User', foreign_keys = [reporter_id],
+                               backref = db.backref('report_complaints', lazy = 'dynamic'))
     channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'))
     channel = db.relationship('Channel', backref = db.backref('complaints', lazy = 'dynamic'))
     reason_type = db.Column(db.Integer)
     reason = db.Column(db.Text)
+    handler_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    handler = db.relationship('User', foreign_keys = [handler_id],
+                              backref = db.backref('handle_complaints', lazy = 'dynamic'))
+    created_at = db.Column(db.DateTime, default = datetime.now)
 
     def __init__(self, **kwargs):
         super(Complaint, self).__init__(**kwargs)
+
+
+class Thumbnail(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    key = db.Column(db.String(128), index = True)
+    domain = db.Column(db.String(128))
+    name = db.Column(db.String(128))
+    created_at = db.Column(db.DateTime, default = datetime.now)
+
+    def __init__(self, **kwargs):
+        self.domain = current_app.config['QINIU_DOMAIN']
+        super(Thumbnail, self).__init__(**kwargs)
+
+    @property
+    def url(self):
+        return 'http://%s/%s' % (self.domain, self.key)
+
+    @staticmethod
+    def random_url():
+        amount = Thumbnail.query.count()
+        if amount == 0:
+            return None
+
+        thumbnail = Thumbnail.query.order_by(db.func.rand()).first()
+        return thumbnail.url

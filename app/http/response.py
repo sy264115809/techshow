@@ -53,6 +53,14 @@ class OAuthFail(APIException):
         super(OAuthFail, self).__init__(code = 4012, desc = 'oauth fail')
 
 
+class UserBanned(APIException):
+    """4013 User is banned
+    """
+
+    def __init__(self):
+        super(UserBanned, self).__init__(code = 4013, desc = 'user is banned')
+
+
 class MaxChannelTouched(APIException):
     """4031 Max Channel's Amount Touched
     """
